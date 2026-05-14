@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type { Tag, TagGroup, Genre } from "@/types/tag";
 
 export function getTags(): Promise<Tag[]> {

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type { CloudFile } from "@/types/file";
 
 export function getMovieFiles(code: string): Promise<CloudFile[]> {

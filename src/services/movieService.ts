@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type { Movie, MovieFilter, MovieFilterOptions } from "@/types/movie";
 import type { PaginatedResult } from "@/types/common";
 import type { Tag } from "@/types/tag";

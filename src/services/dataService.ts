@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 
 export function exportAllData(): Promise<Record<string, unknown[]>> {
   return invoke("export_all_data");
