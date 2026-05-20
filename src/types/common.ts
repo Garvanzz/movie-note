@@ -10,3 +10,8 @@ export interface FilterOption {
   value: string;
   count: number;
 }
+
+export interface WorkspaceInfo {
+  name: string;
+  is_active: boolean;
+}

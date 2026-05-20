@@ -1,23 +1,8 @@
-pub mod actor;
-pub mod data;
-pub mod file;
-pub mod movie;
-pub mod scraper;
-pub mod tag;
-
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PaginatedResult<T> {
-    pub items: Vec<T>,
-    pub total: i64,
-    pub page: i64,
-    pub page_size: i64,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FilterOption {
-    pub label: String,
-    pub value: String,
-    pub count: i64,
-}
+pub mod movie_commands;
+pub mod file_commands;
+pub mod actor_commands;
+pub mod tag_commands;
+pub mod scraper_commands;
+pub mod export_commands;
+pub mod image_commands;
+pub mod workspace_commands;

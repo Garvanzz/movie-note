@@ -36,4 +36,13 @@ export interface MovieFilter {
 export interface MovieFilterOptions {
   tags: FilterOption[];
   series: FilterOption[];
+  actors: FilterOption[];
+  genres: FilterOption[];
+}
+
+export interface MovieSuggestion {
+  code: string;
+  title: string | null;
+  release_date: string | null;
+  match_kind: string;
 }

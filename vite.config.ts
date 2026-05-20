@@ -13,6 +13,9 @@ export default defineConfig(async () => ({
     },
   },
   clearScreen: false,
+  optimizeDeps: {
+    exclude: ["@tauri-apps/api"],
+  },
   server: {
     port: 1420,
     strictPort: true,

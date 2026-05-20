@@ -54,6 +54,8 @@
       "Bash(cp /c/mingw64/mingw64/bin/libgcc_s_seh-1.dll /d/self/movie-note/src-tauri/target/debug/deps/)",
       "Bash(cp /c/mingw64/mingw64/bin/libwinpthread-1.dll /d/self/movie-note/src-tauri/target/debug/deps/)",
       "Bash(RUSTFLAGS=\"-C target-feature=+crt-static\" cargo test)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
       "Bash(dir /s /b \"D:\\\\self\")",
       "Bash(curl -s http://localhost:1420)",
       "Bash(kill %1)",
@@ -87,7 +89,22 @@
       "Bash(git config *)",
       "Bash(git rm *)",
       "Bash(git restore *)",
-      "Bash(git status *)"
+      "Bash(git status *)",
+      "Bash(git stash *)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:1420)",
+      "Bash(rustup show *)",
+      "Bash(where windres *)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill *)",
+      "Bash(cat *)",
+      "Bash(awk '{print $NF}')",
+      "Bash(git checkout *)",
+      "Bash(xargs -r taskkill //F //PID)",
+      "Bash(xargs grep -l \"cover_path\\\\|avatar_path\\\\|screenshot\")",
+      "Bash(xargs grep -l \"file\\\\|convert\\\\|img\\\\|src\\\\|image\\\\|cover\\\\|avatar\")",
+      "Bash(cmd *)",
+      "Bash(powershell *)"
     ]
   }
 }

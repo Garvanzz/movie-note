@@ -3,21 +3,23 @@ name = "movie-note"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "movie_note_lib"
+crate-type = ["lib", "staticlib"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
-chrono = "0.4"
-reqwest = { version = "0.12", features = ["blocking"] }
-scraper = "0.20"
-url = "2"
-
-[features]
-default = ["custom-protocol"]
-custom-protocol = ["tauri/custom-protocol"]
+reqwest = { version = "0.12", features = ["json", "cookies"] }
+scraper = "0.19"
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
+thiserror = "1"

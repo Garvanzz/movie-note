@@ -1,0 +1,332 @@
+{
+  "tags": [
+    {
+      "id": 1,
+      "name": "新人",
+      "description": "用于测试新人标签"
+    },
+    {
+      "id": 2,
+      "name": "剧情向",
+      "description": "用于测试剧情标签"
+    },
+    {
+      "id": 3,
+      "name": "高评分",
+      "description": "用于测试评分筛选"
+    }
+  ],
+  "genres": [
+    {
+      "id": 1,
+      "name": "企划",
+      "description": "测试类型"
+    },
+    {
+      "id": 2,
+      "name": "剧情",
+      "description": "测试类型"
+    },
+    {
+      "id": 3,
+      "name": "人妻",
+      "description": "测试类型"
+    }
+  ],
+  "actors": [
+    {
+      "id": 1,
+      "name": "三上悠亚",
+      "name_jp": "三上悠亜",
+      "measurements": "B83/W58/H84",
+      "birth_date": "1993-08-16",
+      "debut_year": 2015,
+      "rating": 4.8,
+      "comment": "用于测试主名、日文名、别名搜索",
+      "avatar_path": null,
+      "created_at": "2026-05-25 10:00:00",
+      "updated_at": "2026-05-25 10:00:00"
+    },
+    {
+      "id": 2,
+      "name": "河北彩花",
+      "name_jp": "河北彩伽",
+      "measurements": "B87/W59/H86",
+      "birth_date": "1999-04-24",
+      "debut_year": 2018,
+      "rating": 4.7,
+      "comment": "用于测试演员筛选和别名维护",
+      "avatar_path": null,
+      "created_at": "2026-05-25 10:01:00",
+      "updated_at": "2026-05-25 10:01:00"
+    },
+    {
+      "id": 3,
+      "name": "明里紬",
+      "name_jp": "明里つむぎ",
+      "measurements": "B82/W54/H80",
+      "birth_date": "1998-03-06",
+      "debut_year": 2017,
+      "rating": 4.5,
+      "comment": "用于测试多片关联",
+      "avatar_path": null,
+      "created_at": "2026-05-25 10:02:00",
+      "updated_at": "2026-05-25 10:02:00"
+    },
+    {
+      "id": 4,
+      "name": "桥本有菜",
+      "name_jp": "橋本ありな",
+      "measurements": "B83/W56/H83",
+      "birth_date": "1996-12-15",
+      "debut_year": 2016,
+      "rating": 4.4,
+      "comment": "用于测试演员列表和全局搜索",
+      "avatar_path": null,
+      "created_at": "2026-05-25 10:03:00",
+      "updated_at": "2026-05-25 10:03:00"
+    }
+  ],
+  "actor_aliases": [
+    {
+      "id": 1,
+      "actor_id": 1,
+      "alias": "Yua Mikami"
+    },
+    {
+      "id": 2,
+      "actor_id": 1,
+      "alias": "Mikami Yua"
+    },
+    {
+      "id": 3,
+      "actor_id": 2,
+      "alias": "Kawakita Saika"
+    },
+    {
+      "id": 4,
+      "actor_id": 2,
+      "alias": "河北彩伽"
+    },
+    {
+      "id": 5,
+      "actor_id": 3,
+      "alias": "Akari Tsumugi"
+    },
+    {
+      "id": 6,
+      "actor_id": 4,
+      "alias": "Arina Hashimoto"
+    }
+  ],
+  "movies": [
+    {
+      "code": "IPX-123",
+      "code_norm": "IPX123",
+      "code_kind": "standard",
+      "code_sort_key": "standard:ipx:000123",
+      "series": "IPX",
+      "title": "测试影片 A",
+      "title_jp": "テスト作品 A",
+      "runtime": 150,
+      "release_date": "2024-01-12",
+      "rating": 4.6,
+      "comment": "用于测试番号规范化和 suggestion",
+      "notes": "输入 ipx / ipx123 / IPX 123 都应该能命中",
+      "watch_status": "unwatched",
+      "cover_path": null,
+      "source_url": null,
+      "source_site": null,
+      "created_at": "2026-05-25 11:00:00",
+      "updated_at": "2026-05-25 11:00:00"
+    },
+    {
+      "code": "IPX-124",
+      "code_norm": "IPX124",
+      "code_kind": "standard",
+      "code_sort_key": "standard:ipx:000124",
+      "series": "IPX",
+      "title": "测试影片 B",
+      "title_jp": "テスト作品 B",
+      "runtime": 118,
+      "release_date": "2024-02-18",
+      "rating": 4.2,
+      "comment": "用于测试连续番号前缀匹配",
+      "notes": null,
+      "watch_status": "watched",
+      "cover_path": null,
+      "source_url": null,
+      "source_site": null,
+      "created_at": "2026-05-25 11:05:00",
+      "updated_at": "2026-05-25 11:05:00"
+    },
+    {
+      "code": "SSIS-001",
+      "code_norm": "SSIS001",
+      "code_kind": "standard",
+      "code_sort_key": "standard:ssis:000001",
+      "series": "SSIS",
+      "title": "测试影片 C",
+      "title_jp": "テスト作品 C",
+      "runtime": 120,
+      "release_date": "2023-11-02",
+      "rating": 4.9,
+      "comment": "用于测试高评分和演员交叉筛选",
+      "notes": null,
+      "watch_status": "unwatched",
+      "cover_path": null,
+      "source_url": null,
+      "source_site": null,
+      "created_at": "2026-05-25 11:10:00",
+      "updated_at": "2026-05-25 11:10:00"
+    },
+    {
+      "code": "SSIS-777",
+      "code_norm": "SSIS777",
+      "code_kind": "standard",
+      "code_sort_key": "standard:ssis:000777",
+      "series": "SSIS",
+      "title": "测试影片 D",
+      "title_jp": null,
+      "runtime": 135,
+      "release_date": "2024-03-22",
+      "rating": 3.8,
+      "comment": "用于测试 title 搜索",
+      "notes": "可搜 测试影片 D",
+      "watch_status": "watching",
+      "cover_path": null,
+      "source_url": null,
+      "source_site": null,
+      "created_at": "2026-05-25 11:15:00",
+      "updated_at": "2026-05-25 11:15:00"
+    },
+    {
+      "code": "FC2-PPV-3312345",
+      "code_norm": "FC2PPV3312345",
+      "code_kind": "fc2",
+      "code_sort_key": "fc2:003312345",
+      "series": "FC2-PPV",
+      "title": "FC2 测试样本",
+      "title_jp": null,
+      "runtime": 95,
+      "release_date": "2024-04-08",
+      "rating": 4.1,
+      "comment": "用于测试 FC2 番号搜索",
+      "notes": "可测试 fc2 3312345",
+      "watch_status": "paused",
+      "cover_path": null,
+      "source_url": null,
+      "source_site": null,
+      "created_at": "2026-05-25 11:20:00",
+      "updated_at": "2026-05-25 11:20:00"
+    },
+    {
+      "code": "ABW-321",
+      "code_norm": "ABW321",
+      "code_kind": "standard",
+      "code_sort_key": "standard:abw:000321",
+      "series": "ABW",
+      "title": "桥本有菜测试片",
+      "title_jp": null,
+      "runtime": 110,
+      "release_date": "2024-05-10",
+      "rating": 4.0,
+      "comment": "用于测试演员和番号交叉搜索",
+      "notes": null,
+      "watch_status": "unwatched",
+      "cover_path": null,
+      "source_url": null,
+      "source_site": null,
+      "created_at": "2026-05-25 11:25:00",
+      "updated_at": "2026-05-25 11:25:00"
+    }
+  ],
+  "movie_actors": [
+    {
+      "id": 1,
+      "code": "IPX-123",
+      "actor_id": 1
+    },
+    {
+      "id": 2,
+      "code": "IPX-124",
+      "actor_id": 1
+    },
+    {
+      "id": 3,
+      "code": "SSIS-001",
+      "actor_id": 2
+    },
+    {
+      "id": 4,
+      "code": "SSIS-777",
+      "actor_id": 3
+    },
+    {
+      "id": 5,
+      "code": "FC2-PPV-3312345",
+      "actor_id": 3
+    },
+    {
+      "id": 6,
+      "code": "ABW-321",
+      "actor_id": 4
+    }
+  ],
+  "movie_tags": [
+    {
+      "id": 1,
+      "code": "IPX-123",
+      "tag_id": 1
+    },
+    {
+      "id": 2,
+      "code": "SSIS-001",
+      "tag_id": 3
+    },
+    {
+      "id": 3,
+      "code": "SSIS-777",
+      "tag_id": 2
+    },
+    {
+      "id": 4,
+      "code": "ABW-321",
+      "tag_id": 1
+    }
+  ],
+  "movie_genres": [
+    {
+      "id": 1,
+      "code": "IPX-123",
+      "genre_id": 1
+    },
+    {
+      "id": 2,
+      "code": "SSIS-001",
+      "genre_id": 2
+    },
+    {
+      "id": 3,
+      "code": "SSIS-777",
+      "genre_id": 2
+    },
+    {
+      "id": 4,
+      "code": "ABW-321",
+      "genre_id": 3
+    }
+  ],
+  "actor_tags": [
+    {
+      "id": 1,
+      "actor_id": 1,
+      "tag_id": 3
+    },
+    {
+      "id": 2,
+      "actor_id": 2,
+      "tag_id": 1
+    }
+  ]
+}

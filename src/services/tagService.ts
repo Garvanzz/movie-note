@@ -1,12 +1,12 @@
 import { invoke } from "./invoke";
-import type { Tag, TagGroup, Genre } from "@/types/tag";
+import type { Genre, Tag, TagGroup, TagScope } from "@/types/tag";
 
-export function getTags(): Promise<Tag[]> {
-  return invoke("get_tags");
+export function getTags(scope?: TagScope): Promise<Tag[]> {
+  return invoke("get_tags", { scope: scope ?? null });
 }
 
-export function createTag(name: string): Promise<Tag> {
-  return invoke("create_tag", { name });
+export function createTag(name: string, scope: TagScope): Promise<Tag> {
+  return invoke("create_tag", { name, scope });
 }
 
 export function deleteTag(id: number): Promise<void> {
@@ -21,8 +21,14 @@ export function createTagGroup(name: string): Promise<TagGroup> {
   return invoke("create_tag_group", { name });
 }
 
-export function getGenres(): Promise<Genre[]> {
-  return invoke("get_genres");
+export function deleteTagGroup(id: number): Promise<void> {
+  return invoke("delete_tag_group", { id });
+}
+
+export async function getGenres(): Promise<Genre[]> {
+  const result = await invoke<Genre[]>("get_genres");
+  console.log("[getGenres] raw result:", result);
+  return result;
 }
 
 export function createGenre(name: string): Promise<Genre> {
@@ -31,4 +37,16 @@ export function createGenre(name: string): Promise<Genre> {
 
 export function deleteGenre(id: number): Promise<void> {
   return invoke("delete_genre", { id });
+}
+
+export function getTagGroupItems(groupId: number): Promise<Tag[]> {
+  return invoke("get_tag_group_items", { groupId });
+}
+
+export function addTagToGroup(groupId: number, tagId: number, sortOrder?: number): Promise<void> {
+  return invoke("add_tag_to_group", { groupId, tagId, sortOrder: sortOrder ?? null });
+}
+
+export function removeTagFromGroup(groupId: number, tagId: number): Promise<void> {
+  return invoke("remove_tag_from_group", { groupId, tagId });
 }

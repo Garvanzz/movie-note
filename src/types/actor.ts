@@ -11,3 +11,17 @@ export interface Actor {
   created_at: string;
   updated_at: string;
 }
+
+export interface ActorCategory {
+  id: number;
+  name: string;
+  sort_order: number;
+}
+
+export interface ActorSuggestion {
+  id: number;
+  name: string;
+  name_jp: string | null;
+  matched_name: string;
+  match_kind: string;
+}

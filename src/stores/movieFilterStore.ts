@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 import type { MovieFilter } from "@/types/movie";
 
 interface MovieFilterState extends MovieFilter {
@@ -6,6 +7,7 @@ interface MovieFilterState extends MovieFilter {
   page: number;
   pageSize: number;
   setFilter: (filter: Partial<MovieFilter>) => void;
+  setSort: (sortBy: string | undefined, sortDir: string | undefined) => void;
   resetFilter: () => void;
   setPage: (page: number) => void;
   setViewMode: (mode: "grid" | "table") => void;
@@ -19,7 +21,13 @@ interface MovieFilterState extends MovieFilter {
   setHasFiles: (hasFiles: boolean | undefined) => void;
 }
 
-export const useMovieFilterStore = create<MovieFilterState>((set) => ({
+const fallbackStorage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined,
+};
+
+export const useMovieFilterStore = create<MovieFilterState>()(persist((set) => ({
   viewMode: "grid",
   page: 1,
   pageSize: 40,
@@ -30,6 +38,9 @@ export const useMovieFilterStore = create<MovieFilterState>((set) => ({
       ...filter,
       page: 1,
     })),
+
+  setSort: (sort_by, sort_dir) =>
+    set({ sort_by, sort_dir, page: 1 }),
 
   resetFilter: () =>
     set({
@@ -80,4 +91,23 @@ export const useMovieFilterStore = create<MovieFilterState>((set) => ({
   setRatingRange: (min, max) => set({ rating_min: min, rating_max: max, page: 1 }),
   setWatchStatus: (watch_status) => set({ watch_status, page: 1 }),
   setHasFiles: (has_files) => set({ has_files, page: 1 }),
+}), {
+  name: "movie-filter-store",
+  storage: createJSONStorage(() => (typeof window === "undefined" ? fallbackStorage : sessionStorage)),
+  partialize: (state) => ({
+    search: state.search,
+    tag_ids: state.tag_ids,
+    actor_ids: state.actor_ids,
+    genre_ids: state.genre_ids,
+    series: state.series,
+    rating_min: state.rating_min,
+    rating_max: state.rating_max,
+    watch_status: state.watch_status,
+    has_files: state.has_files,
+    sort_by: state.sort_by,
+    sort_dir: state.sort_dir,
+    page: state.page,
+    pageSize: state.pageSize,
+    viewMode: state.viewMode,
+  }),
 }));
