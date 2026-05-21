@@ -282,7 +282,7 @@ pub fn update_movie(
          series = COALESCE(?10, series), source_url = COALESCE(?11, source_url), \
          source_site = COALESCE(?12, source_site), updated_at = datetime('now') \
          WHERE code = ?1",
-        params![code.to_uppercase(), title, title_jp, runtime, release_date,
+        params![normalize_for_storage(&code).canonical, title, title_jp, runtime, release_date,
                 rating, comment, notes, watch_status, series, source_url, source_site],
     )
     .map_err(|e| format!("Failed to update movie: {}", e))?;

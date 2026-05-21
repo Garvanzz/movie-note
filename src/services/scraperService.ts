@@ -37,3 +37,11 @@ export function scraperGetDetail(url: string, source: string): Promise<ScraperMo
 export function scraperImport(detail: ScraperMovieDetail): Promise<void> {
   return invoke("scraper_import", { detail });
 }
+
+export function scraperDownloadImages(
+  code: string,
+  coverUrl: string | null,
+  screenshots: string[],
+): Promise<void> {
+  return invoke("scraper_download_images", { code, coverUrl, screenshots });
+}

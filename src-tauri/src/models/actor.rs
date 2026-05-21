@@ -24,6 +24,16 @@ pub struct ActorCategory {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ActorName {
+    pub id: i64,
+    pub actor_id: i64,
+    pub name: String,
+    pub kind: String,
+    pub is_primary: bool,
+    pub sort_order: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ActorSuggestion {
     pub id: i64,
     pub name: String,

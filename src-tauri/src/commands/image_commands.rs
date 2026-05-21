@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use rusqlite::{params, Connection};
 use tauri::State;
+use crate::code_parser::normalize_for_storage;
 use crate::db::Database;
 use crate::models::{MovieCover, MovieScreenshot, ActorImage, SavedImage};
 
@@ -16,10 +17,10 @@ fn unique_filename(ext: &str) -> String {
     format!("{:x}_{:04x}.{}", nanos, random, ext)
 }
 
-fn ensure_images_dir(app_data: &PathBuf) -> PathBuf {
+fn ensure_images_dir(app_data: &PathBuf) -> Result<PathBuf, String> {
     let dir = app_data.join("images");
-    std::fs::create_dir_all(&dir).ok();
-    dir
+    std::fs::create_dir_all(&dir).map_err(|e| format!("创建图片目录失败: {}", e))?;
+    Ok(dir)
 }
 
 fn extension_from_path(path: &str) -> &str {
@@ -43,7 +44,7 @@ fn extension_from_content_type(ct: &str) -> &str {
 fn copy_file_to_images(app_data: &PathBuf, source: &str) -> Result<String, String> {
     let ext = extension_from_path(source).to_lowercase();
     let filename = unique_filename(&ext);
-    let dir = ensure_images_dir(app_data);
+    let dir = ensure_images_dir(app_data)?;
     let dest = dir.join(&filename);
     std::fs::copy(source, &dest)
         .map_err(|e| format!("复制文件失败: {}", e))?;
@@ -69,7 +70,7 @@ pub(crate) fn download_url_to_images(app_data: &PathBuf, url: &str) -> Result<St
         resp.bytes().await.map_err(|e| format!("读取响应失败: {}", e))
     })?;
     let filename = unique_filename(ext);
-    let dir = ensure_images_dir(app_data);
+    let dir = ensure_images_dir(app_data)?;
     let dest = dir.join(&filename);
     std::fs::write(&dest, &bytes)
         .map_err(|e| format!("写入文件失败: {}", e))?;
@@ -77,7 +78,9 @@ pub(crate) fn download_url_to_images(app_data: &PathBuf, url: &str) -> Result<St
 }
 
 pub(crate) fn delete_image_file(path: &str) {
-    std::fs::remove_file(path).ok();
+    if let Err(e) = std::fs::remove_file(path) {
+        eprintln!("Failed to delete image file {}: {}", path, e);
+    }
 }
 
 fn maybe_delete_unused_actor_avatar(conn: &Connection, app_data: &PathBuf, old_path: Option<String>) {
@@ -112,7 +115,7 @@ pub fn get_movie_covers(db: State<Database>, code: String) -> Result<Vec<MovieCo
     let mut stmt = conn.prepare(
         "SELECT id, code, image_path, is_primary, source FROM movie_covers WHERE code = ?1 ORDER BY id ASC"
     ).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(params![code.to_uppercase()], |row| {
+    let rows = stmt.query_map(params![normalize_for_storage(&code).canonical], |row| {
         Ok(MovieCover {
             id: row.get(0)?,
             code: row.get(1)?,
@@ -129,7 +132,7 @@ pub fn add_movie_cover(db: State<Database>, code: String, file_path: String, set
     let app_data = db.app_data_dir.clone();
     let new_path = copy_file_to_images(&app_data, &file_path)?;
     let is_primary = set_primary.unwrap_or(false);
-    let code_upper = code.to_uppercase();
+    let code_upper = normalize_for_storage(&code).canonical;
 
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
@@ -155,7 +158,7 @@ pub fn add_movie_cover_from_url(db: State<Database>, code: String, url: String, 
     let app_data = db.app_data_dir.clone();
     let new_path = download_url_to_images(&app_data, &url)?;
     let is_primary = set_primary.unwrap_or(false);
-    let code_upper = code.to_uppercase();
+    let code_upper = normalize_for_storage(&code).canonical;
 
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
@@ -178,7 +181,7 @@ pub fn add_movie_cover_from_url(db: State<Database>, code: String, url: String, 
 
 #[tauri::command]
 pub fn remove_movie_cover(db: State<Database>, code: String, cover_id: i64) -> Result<(), String> {
-    let code_upper = code.to_uppercase();
+    let code_upper = normalize_for_storage(&code).canonical;
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
     // Get the cover to remove
@@ -217,7 +220,7 @@ pub fn remove_movie_cover(db: State<Database>, code: String, cover_id: i64) -> R
 
 #[tauri::command]
 pub fn set_movie_primary_cover(db: State<Database>, code: String, cover_id: i64) -> Result<(), String> {
-    let code_upper = code.to_uppercase();
+    let code_upper = normalize_for_storage(&code).canonical;
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
     let new_path: String = conn.query_row(
@@ -244,7 +247,7 @@ pub fn get_movie_screenshots(db: State<Database>, code: String) -> Result<Vec<Mo
     let mut stmt = conn.prepare(
         "SELECT id, code, image_path, sort_order FROM movie_screenshots WHERE code = ?1 ORDER BY sort_order ASC, id ASC"
     ).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(params![code.to_uppercase()], |row| {
+    let rows = stmt.query_map(params![normalize_for_storage(&code).canonical], |row| {
         Ok(MovieScreenshot {
             id: row.get(0)?,
             code: row.get(1)?,
@@ -259,7 +262,7 @@ pub fn get_movie_screenshots(db: State<Database>, code: String) -> Result<Vec<Mo
 pub fn add_movie_screenshot(db: State<Database>, code: String, file_path: String) -> Result<MovieScreenshot, String> {
     let app_data = db.app_data_dir.clone();
     let new_path = copy_file_to_images(&app_data, &file_path)?;
-    let code_upper = code.to_uppercase();
+    let code_upper = normalize_for_storage(&code).canonical;
 
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let max_order: i32 = conn.query_row(
@@ -282,7 +285,7 @@ pub fn add_movie_screenshot(db: State<Database>, code: String, file_path: String
 pub fn add_movie_screenshot_from_url(db: State<Database>, code: String, url: String) -> Result<MovieScreenshot, String> {
     let app_data = db.app_data_dir.clone();
     let new_path = download_url_to_images(&app_data, &url)?;
-    let code_upper = code.to_uppercase();
+    let code_upper = normalize_for_storage(&code).canonical;
 
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let max_order: i32 = conn.query_row(
@@ -490,7 +493,7 @@ pub fn save_image_bytes(
     let app_data = db.app_data_dir.clone();
     let ext = extension_from_path(&filename).to_lowercase();
     let unique_name = unique_filename(&ext);
-    let dir = ensure_images_dir(&app_data);
+    let dir = ensure_images_dir(&app_data)?;
     let dest = dir.join(&unique_name);
     let dest_str = dest.to_string_lossy().to_string();
 

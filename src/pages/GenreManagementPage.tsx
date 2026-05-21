@@ -169,31 +169,8 @@ export function GenreManagementPage() {
         ) : actorTypes.length > 0 ? (
           <div className="space-y-2">
             {actorTypes.map((actorType, index) => (
-              <div key={actorType.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/60 px-4 py-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="size-8"
-                      disabled={index === 0 || moveActorTypeMutation.isPending}
-                      onClick={() => moveActorTypeMutation.mutate({ id: actorType.id, direction: "up" })}
-                      title="上移"
-                    >
-                      <ArrowUp className="size-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="size-8"
-                      disabled={index === actorTypes.length - 1 || moveActorTypeMutation.isPending}
-                      onClick={() => moveActorTypeMutation.mutate({ id: actorType.id, direction: "down" })}
-                      title="下移"
-                    >
-                      <ArrowDown className="size-3.5" />
-                    </Button>
-                  </div>
-
+              <div key={actorType.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/50 px-4 py-3">
+                <div className="min-w-0 flex-1">
                   <button
                     type="button"
                     onClick={() => navigate(`/actors?category=${actorType.id}`)}
@@ -204,20 +181,42 @@ export function GenreManagementPage() {
                   </button>
                 </div>
 
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="size-8"
-                  onClick={() => {
-                    if (confirm(`删除演员类型 "${actorType.name}"?`)) {
-                      deleteActorTypeMutation.mutate(actorType.id);
-                    }
-                  }}
-                  title="删除演员类型"
-                >
-                  <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-8"
+                    disabled={index === 0 || moveActorTypeMutation.isPending}
+                    onClick={() => moveActorTypeMutation.mutate({ id: actorType.id, direction: "up" })}
+                    title="上移"
+                  >
+                    <ArrowUp className="size-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-8"
+                    disabled={index === actorTypes.length - 1 || moveActorTypeMutation.isPending}
+                    onClick={() => moveActorTypeMutation.mutate({ id: actorType.id, direction: "down" })}
+                    title="下移"
+                  >
+                    <ArrowDown className="size-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-8"
+                    onClick={() => {
+                      if (confirm(`删除演员类型 "${actorType.name}"?`)) {
+                        deleteActorTypeMutation.mutate(actorType.id);
+                      }
+                    }}
+                    title="删除演员类型"
+                  >
+                    <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

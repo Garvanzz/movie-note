@@ -204,15 +204,15 @@ mod tests {
             )
             .unwrap();
 
-        // 18 user tables + _schema_version + sqlite_sequence
-        assert!(table_count >= 18, "Expected at least 18 tables");
+        // 19 user tables + _schema_version + sqlite_sequence
+        assert!(table_count >= 19, "Expected at least 19 tables");
 
         // Verify key tables exist
         let tables = ["movies", "actors", "tags", "genres", "tag_groups",
             "movie_actors", "movie_tags", "movie_genres", "movie_covers",
             "movie_screenshots", "files", "code_aliases", "actor_aliases",
             "actor_tags", "actor_categories", "actor_category_relations",
-            "actor_images", "tag_group_items"];
+            "actor_images", "actor_names", "tag_group_items"];
         for table in &tables {
             let exists: bool = conn
                 .query_row(

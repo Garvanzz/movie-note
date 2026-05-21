@@ -1,24 +1,35 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, Trash2, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, X } from "lucide-react";
 import { ActorAssetsSection } from "@/components/actor/ActorAssetsSection";
 import { ActorMoviePreviewSection } from "@/components/actor/ActorMoviePreviewSection";
+import { InlineOptionMenu } from "@/components/ui/inline-option-menu";
+import { SearchSuggestionList } from "@/components/search/SearchSuggestionList";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ImageLightbox, type LightboxItem } from "@/components/ui/image-lightbox";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useImagePicker } from "@/hooks/useImagePicker";
 import { useMovieFilterNavigation } from "@/hooks/useMovieFilterNavigation";
 import { usePasteImage } from "@/hooks/usePasteImage";
+import { useActorSuggestions } from "@/hooks/useSearchSuggestions";
 import { assetUrl } from "@/lib/assetUrl";
+import { describeActorMatch, parseActorNames } from "@/lib/utils";
+import type { ActorName } from "@/types/actor";
 import {
+  addActorName,
   addActorToCategory,
   deleteActor,
   getActor,
+  getActorNames,
   getActorCategories,
   getCategoriesForActor,
+  mergeActors,
+  removeActorName,
   removeActorFromCategory,
+  updateActorName,
   updateActor,
 } from "@/services/actorService";
 import {
@@ -44,10 +55,16 @@ export function ActorDetailPage() {
 
   const [rating, setRating] = useState<number | undefined>();
   const [comment, setComment] = useState("");
+  const [mainName, setMainName] = useState("");
+  const [newActorName, setNewActorName] = useState("");
+  const [mergeQuery, setMergeQuery] = useState("");
+  const [mergeFocused, setMergeFocused] = useState(false);
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [selectedActorImageId, setSelectedActorImageId] = useState<number | null>(null);
   const [lightbox, setLightbox] = useState<{ items: LightboxItem[]; index: number } | null>(null);
   const [typeBusy, setTypeBusy] = useState(false);
+  const [nameBusy, setNameBusy] = useState(false);
+  const [mergeBusy, setMergeBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const avatarHoverRef = useRef(false);
   const galleryHoverRef = useRef(false);
@@ -75,11 +92,25 @@ export function ActorDetailPage() {
     enabled: !!id,
   });
 
+  const { data: actorNameItems } = useQuery({
+    queryKey: ["actorNames", id],
+    queryFn: () => getActorNames(actorId),
+    enabled: !!id,
+  });
+
+  const { data: mergeSuggestions = [], isFetching: isMergeSuggestionsFetching } = useActorSuggestions(mergeQuery, mergeFocused, 8);
+
   const types = assignedTypes ?? [];
   const images = actorImages ?? [];
+  const actorNames = actorNameItems ?? [];
+  const primaryActorName = actorNames.find((item) => item.is_primary) ?? actorNames[0] ?? null;
+  const secondaryActorNames = actorNames.filter((item) => item.id !== primaryActorName?.id);
+  const availableMergeTargets = mergeSuggestions.filter((item) => item.id !== actorId);
+  const exactMergeTarget = availableMergeTargets.filter((item) => item.match_kind.endsWith("_exact"));
   const assignedTypeIds = new Set(types.map((item) => item.id));
   const availableTypes = (allTypes ?? []).filter((item) => !assignedTypeIds.has(item.id));
 
+  const debouncedMainName = useDebounce(mainName, 350);
   const debouncedComment = useDebounce(comment, 500);
   const debouncedRating = useDebounce(rating, 180);
   const initialComment = actor?.comment ?? "";
@@ -143,6 +174,10 @@ export function ActorDetailPage() {
   }, [actor]);
 
   useEffect(() => {
+    setMainName(primaryActorName?.name ?? "");
+  }, [primaryActorName?.id, primaryActorName?.name]);
+
+  useEffect(() => {
     if (!actor) return;
 
     addRecentVisit({
@@ -159,7 +194,7 @@ export function ActorDetailPage() {
       updateActor({
         id: actorId,
         rating: payload.rating,
-        comment: payload.comment.trim() || undefined,
+        comment: payload.comment,
       }),
     onSuccess: async () => {
       await Promise.all([
@@ -178,13 +213,56 @@ export function ActorDetailPage() {
 
   useEffect(() => {
     if (!actor) return;
-    if (debouncedComment === initialComment && debouncedRating === initialRating) return;
+    if (debouncedComment === initialComment && debouncedRating === initialRating) {
+      return;
+    }
 
     updateMutation.mutate({
       rating: debouncedRating,
       comment: debouncedComment,
     });
   }, [actor, debouncedComment, debouncedRating, initialComment, initialRating]);
+
+  useEffect(() => {
+    if (!primaryActorName) {
+      return;
+    }
+
+    const trimmed = debouncedMainName.trim();
+    if (!trimmed || trimmed === primaryActorName.name) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncPrimaryName = async () => {
+      setNameBusy(true);
+      try {
+        await updateActorName(primaryActorName.id, trimmed, primaryActorName.kind, true);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["actor", id] }),
+          queryClient.invalidateQueries({ queryKey: ["actorNames", id] }),
+          queryClient.invalidateQueries({ queryKey: ["actors"] }),
+          queryClient.invalidateQueries({ queryKey: ["actorSuggestions"] }),
+        ]);
+      } catch (error) {
+        if (!cancelled) {
+          toast.error(`更新姓名失败: ${error}`);
+          setMainName(primaryActorName.name);
+        }
+      } finally {
+        if (!cancelled) {
+          setNameBusy(false);
+        }
+      }
+    };
+
+    void syncPrimaryName();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedMainName, primaryActorName?.id, primaryActorName?.kind, primaryActorName?.name, id, queryClient]);
 
   useEffect(() => {
     if (images.length === 0) {
@@ -275,6 +353,97 @@ export function ActorDetailPage() {
       toast.error(`移除类型失败: ${error}`);
     } finally {
       setTypeBusy(false);
+    }
+  };
+
+  const invalidateActorMeta = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["actor", id] }),
+      queryClient.invalidateQueries({ queryKey: ["actorNames", id] }),
+      queryClient.invalidateQueries({ queryKey: ["actors"] }),
+      queryClient.invalidateQueries({ queryKey: ["actorSuggestions"] }),
+    ]);
+  };
+
+  const handleAddActorName = async () => {
+    const names = parseActorNames(newActorName);
+    if (names.length === 0) {
+      toast.error("请输入姓名");
+      return;
+    }
+
+    setNameBusy(true);
+    try {
+      let addedCount = 0;
+      for (const name of names) {
+        if (actorNames.some((item) => item.name.toLowerCase() === name.toLowerCase())) {
+          continue;
+        }
+        await addActorName(actorId, name, "alias", false);
+        addedCount += 1;
+      }
+
+      if (addedCount === 0) {
+        toast.error("这些姓名都已存在");
+        return;
+      }
+
+      setNewActorName("");
+      await invalidateActorMeta();
+    } catch (error) {
+      toast.error(`添加姓名失败: ${error}`);
+    } finally {
+      setNameBusy(false);
+    }
+  };
+
+  const handleSetPrimaryName = async (target: ActorName) => {
+    if (target.is_primary) {
+      return;
+    }
+
+    setNameBusy(true);
+    try {
+      await updateActorName(target.id, target.name, target.kind, true);
+      await invalidateActorMeta();
+    } catch (error) {
+      toast.error(`设置主显示名失败: ${error}`);
+    } finally {
+      setNameBusy(false);
+    }
+  };
+
+  const handleRemoveActorName = async (nameId: number) => {
+    setNameBusy(true);
+    try {
+      await removeActorName(nameId);
+      await invalidateActorMeta();
+    } catch (error) {
+      toast.error(`删除姓名失败: ${error}`);
+    } finally {
+      setNameBusy(false);
+    }
+  };
+
+  const handleMergeIntoActor = async (targetActorId: number, targetActorName: string) => {
+    if (!confirm(`确定将当前演员“${actor.name}”合并到“${targetActorName}”吗？\n\n当前演员会被删除，作品关联、类型、图片和姓名都会迁移到目标演员。`)) {
+      return;
+    }
+
+    setMergeBusy(true);
+    try {
+      const merged = await mergeActors(actorId, targetActorId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["actors"] }),
+        queryClient.invalidateQueries({ queryKey: ["actorSuggestions"] }),
+        queryClient.invalidateQueries({ queryKey: ["movieActors"] }),
+      ]);
+      toast.success(`已将 ${actor.name} 合并到 ${merged.name}`);
+      navigate(`/actors/${merged.id}`);
+    } catch (error) {
+      toast.error(`合并演员失败: ${error}`);
+    } finally {
+      setMergeBusy(false);
     }
   };
 
@@ -404,6 +573,133 @@ export function ActorDetailPage() {
 
         <div className="overflow-hidden rounded-3xl border border-border/70 bg-card/30">
           <section className="space-y-4 px-6 py-5">
+            <h2 className="text-sm font-medium">姓名</h2>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">主显示名</label>
+                <Input
+                  value={mainName}
+                  onChange={(event) => setMainName(event.target.value)}
+                  placeholder="主显示名"
+                  disabled={nameBusy || !primaryActorName}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                  <span>其他名字</span>
+                  {secondaryActorNames.length > 0 ? <span>点击名字可设为主显示名</span> : null}
+                </div>
+                {secondaryActorNames.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {secondaryActorNames.map((item) => (
+                      <div key={item.id} className="inline-flex items-center overflow-hidden rounded-full border border-border/80 bg-background/50">
+                        <button
+                          type="button"
+                          className="px-3 py-1.5 text-sm transition-colors hover:bg-accent/60"
+                          onClick={() => {
+                            void handleSetPrimaryName(item);
+                          }}
+                          disabled={nameBusy}
+                        >
+                          {item.name}
+                        </button>
+                        <button
+                          type="button"
+                          className="border-l border-border/80 px-2 py-1.5 text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                          onClick={() => {
+                            void handleRemoveActorName(item.id);
+                          }}
+                          disabled={nameBusy}
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">暂无其他名字</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2 rounded-2xl border border-dashed border-border/70 bg-background/20 p-3">
+              <Input
+                value={newActorName}
+                onChange={(event) => setNewActorName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleAddActorName();
+                  }
+                }}
+                placeholder="添加其他名字，可直接粘贴多个名字"
+                disabled={nameBusy}
+              />
+              <Button size="sm" variant="secondary" onClick={() => { void handleAddActorName(); }} disabled={nameBusy || !newActorName.trim()}>
+                <Plus className="size-4" /> 添加
+              </Button>
+            </div>
+          </section>
+
+          <section className="space-y-4 border-t border-border/70 px-6 py-5">
+            <h2 className="text-sm font-medium">合并演员</h2>
+
+            <div className="space-y-2">
+              <div className="relative">
+                <Input
+                  value={mergeQuery}
+                  onFocus={() => setMergeFocused(true)}
+                  onBlur={() => window.setTimeout(() => setMergeFocused(false), 100)}
+                  onChange={(event) => setMergeQuery(event.target.value)}
+                  placeholder="搜索要合并到的演员名、日文名或别名"
+                  disabled={mergeBusy}
+                />
+                <SearchSuggestionList
+                  open={mergeFocused && mergeQuery.trim().length > 0}
+                  loading={isMergeSuggestionsFetching}
+                  emptyLabel="没有匹配演员"
+                  items={availableMergeTargets.map((item) => ({
+                    key: String(item.id),
+                    title: item.name,
+                    subtitle: item.matched_name !== item.name ? `匹配: ${item.matched_name}` : item.name_jp || "演员",
+                    badge: item.match_kind.startsWith("alias_") ? "别名" : item.match_kind.startsWith("name_jp") ? "日文名" : "姓名",
+                    meta: describeActorMatch(item.match_kind),
+                    onSelect: () => {
+                      void handleMergeIntoActor(item.id, item.name);
+                    },
+                  }))}
+                />
+              </div>
+
+              {mergeQuery.trim() ? (
+                <div className="rounded-2xl border border-border/70 bg-background/50 px-3 py-3 text-xs text-muted-foreground">
+                  {exactMergeTarget.length === 1 ? (
+                    <p>检测到唯一精确匹配，可直接把当前演员合并到 <span className="font-medium text-foreground">{exactMergeTarget[0].name}</span>。</p>
+                  ) : exactMergeTarget.length > 1 ? (
+                    <p>存在多个精确匹配，请从候选列表里点选目标演员，避免误合并。</p>
+                  ) : (
+                    <p>请选择一个已有演员作为合并目标。合并后当前演员会被删除。</p>
+                  )}
+                </div>
+              ) : null}
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (exactMergeTarget.length === 1) {
+                    void handleMergeIntoActor(exactMergeTarget[0].id, exactMergeTarget[0].name);
+                  }
+                }}
+                disabled={mergeBusy || exactMergeTarget.length !== 1}
+              >
+                合并到已匹配演员
+              </Button>
+            </div>
+          </section>
+
+          <section className="space-y-4 border-t border-border/70 px-6 py-5">
             <h2 className="text-sm font-medium">类型</h2>
 
             <div className="flex flex-wrap gap-2">
@@ -486,97 +782,6 @@ export function ActorDetailPage() {
         isOpen={!!lightbox}
         onClose={() => setLightbox(null)}
       />
-    </div>
-  );
-}
-
-interface InlineOptionMenuOption {
-  id: number;
-  label: string;
-  secondaryLabel?: string;
-}
-
-function InlineOptionMenu({
-  open,
-  onOpenChange,
-  triggerLabel,
-  emptyLabel,
-  options,
-  disabled,
-  onSelect,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  triggerLabel: string;
-  emptyLabel: string;
-  options: InlineOptionMenuOption[];
-  disabled?: boolean;
-  onSelect: (id: number) => void;
-}) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (target && !containerRef.current?.contains(target)) {
-        onOpenChange(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onOpenChange(false);
-      }
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open, onOpenChange]);
-
-  return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        className="flex h-10 w-full items-center justify-between rounded-2xl border border-input/80 bg-background/50 px-3 text-sm text-foreground transition-colors hover:bg-accent/40 disabled:opacity-50"
-        onClick={() => onOpenChange(!open)}
-        disabled={disabled}
-      >
-        <span>{triggerLabel}</span>
-        <ChevronDown className={`size-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-2xl border border-border/80 bg-card/95 p-1.5 shadow-2xl backdrop-blur">
-          {options.length > 0 ? (
-            <div className="max-h-64 overflow-y-auto">
-              {options.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-accent/60"
-                  onClick={() => {
-                    onSelect(option.id);
-                    onOpenChange(false);
-                  }}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate">{option.label}</span>
-                    {option.secondaryLabel ? <span className="block truncate text-xs text-muted-foreground">{option.secondaryLabel}</span> : null}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="px-3 py-2 text-sm text-muted-foreground">{emptyLabel}</div>
-          )}
-        </div>
-      ) : null}
     </div>
   );
 }

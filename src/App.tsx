@@ -6,6 +6,7 @@ import { ActorListPage } from "./pages/ActorListPage";
 import { ActorDetailPage } from "./pages/ActorDetailPage";
 import { TagManagementPage } from "./pages/TagManagementPage";
 import { GenreManagementPage } from "./pages/GenreManagementPage";
+import { ProviderSettingsPage } from "./pages/ProviderSettingsPage";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/actor-categories" element={<Navigate to="/genres" replace />} />
         <Route path="/tags" element={<TagManagementPage />} />
         <Route path="/genres" element={<GenreManagementPage />} />
+        <Route path="/providers" element={<ProviderSettingsPage />} />
       </Route>
     </Routes>
   );

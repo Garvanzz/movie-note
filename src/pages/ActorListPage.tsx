@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Check, ChevronDown, FolderOpen, Plus, Search, Star, User, X } from "lucide-react";
+import { Check, Plus, Search, Star, User, X } from "lucide-react";
 import { SearchSuggestionList } from "@/components/search/SearchSuggestionList";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { useActorSuggestions } from "@/hooks/useSearchSuggestions";
 import { assetUrl } from "@/lib/assetUrl";
 import { toast } from "sonner";
+import { InlineOptionMenu } from "@/components/ui/inline-option-menu";
 
 const PAGE_SIZE = 24;
 
@@ -112,9 +113,6 @@ export function ActorListPage() {
           {activeCategory ? <Badge variant="outline">类型: {activeCategory.name}</Badge> : null}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate("/actor-categories")}>
-            <FolderOpen className="size-4" /> 类型
-          </Button>
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
@@ -334,93 +332,4 @@ export function ActorListPage() {
   );
 }
 
-interface InlineOptionMenuOption {
-  id: number;
-  label: string;
-  secondaryLabel?: string;
-}
 
-function InlineOptionMenu({
-  open,
-  onOpenChange,
-  triggerLabel,
-  emptyLabel,
-  options,
-  disabled,
-  onSelect,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  triggerLabel: string;
-  emptyLabel: string;
-  options: InlineOptionMenuOption[];
-  disabled?: boolean;
-  onSelect: (id: number) => void;
-}) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (target && !containerRef.current?.contains(target)) {
-        onOpenChange(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onOpenChange(false);
-      }
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open, onOpenChange]);
-
-  return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        className="flex h-10 w-full items-center justify-between rounded-2xl border border-input/80 bg-background/50 px-3 text-sm text-foreground transition-colors hover:bg-accent/40 disabled:opacity-50"
-        onClick={() => onOpenChange(!open)}
-        disabled={disabled}
-      >
-        <span>{triggerLabel}</span>
-        <ChevronDown className={`size-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-2xl border border-border/80 bg-card/95 p-1.5 shadow-2xl backdrop-blur">
-          {options.length > 0 ? (
-            <div className="max-h-64 overflow-y-auto">
-              {options.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-accent/60"
-                  onClick={() => {
-                    onSelect(option.id);
-                    onOpenChange(false);
-                  }}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate">{option.label}</span>
-                    {option.secondaryLabel ? <span className="block truncate text-xs text-muted-foreground">{option.secondaryLabel}</span> : null}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="px-3 py-2 text-sm text-muted-foreground">{emptyLabel}</div>
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
-}

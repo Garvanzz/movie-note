@@ -1,5 +1,6 @@
 use rusqlite::params;
 use tauri::State;
+use crate::code_parser::normalize_for_storage;
 use crate::db::Database;
 use crate::models::{Tag, TagGroup, Genre};
 
@@ -175,7 +176,7 @@ pub fn get_movie_genres(db: State<Database>, code: String) -> Result<Vec<Genre>,
         )
         .map_err(|e| e.to_string())?;
     let items = stmt
-        .query_map(params![code.to_uppercase()], |row| {
+        .query_map(params![normalize_for_storage(&code).canonical], |row| {
             Ok(Genre {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -193,7 +194,7 @@ pub fn add_movie_genre(db: State<Database>, code: String, genre_id: i64) -> Resu
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     conn.execute(
         "INSERT OR IGNORE INTO movie_genres (code, genre_id) VALUES (?1, ?2)",
-        params![code.to_uppercase(), genre_id],
+        params![normalize_for_storage(&code).canonical, genre_id],
     )
     .map_err(|e| e.to_string())?;
     Ok(())
@@ -204,7 +205,7 @@ pub fn remove_movie_genre(db: State<Database>, code: String, genre_id: i64) -> R
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     conn.execute(
         "DELETE FROM movie_genres WHERE code = ?1 AND genre_id = ?2",
-        params![code.to_uppercase(), genre_id],
+        params![normalize_for_storage(&code).canonical, genre_id],
     )
     .map_err(|e| e.to_string())?;
     Ok(())

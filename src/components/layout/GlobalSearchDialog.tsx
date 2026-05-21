@@ -8,6 +8,7 @@ import { useActorSuggestions, useMovieSuggestions } from "@/hooks/useSearchSugge
 import { useMovieFilterNavigation } from "@/hooks/useMovieFilterNavigation";
 import { useMovieFilterOptions } from "@/hooks/useMovies";
 import { useRecentVisitsStore } from "@/stores/recentVisitsStore";
+import { describeActorMatch } from "@/lib/utils";
 
 interface GlobalSearchDialogProps {
   open: boolean;
@@ -262,11 +263,4 @@ function describeMovieMatch(matchKind: string) {
   if (matchKind.startsWith("code_")) return "番号匹配";
   if (matchKind.startsWith("title_")) return "标题匹配";
   return "影片匹配";
-}
-
-function describeActorMatch(matchKind: string) {
-  if (matchKind.startsWith("alias_")) return "别名匹配";
-  if (matchKind.startsWith("name_jp")) return "日文名匹配";
-  if (matchKind.startsWith("name_")) return "姓名匹配";
-  return "演员匹配";
 }

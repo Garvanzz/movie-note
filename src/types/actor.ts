@@ -18,6 +18,17 @@ export interface ActorCategory {
   sort_order: number;
 }
 
+export type ActorNameKind = "native" | "japanese" | "romanized" | "translated" | "stage" | "alias";
+
+export interface ActorName {
+  id: number;
+  actor_id: number;
+  name: string;
+  kind: ActorNameKind;
+  is_primary: boolean;
+  sort_order: number;
+}
+
 export interface ActorSuggestion {
   id: number;
   name: string;

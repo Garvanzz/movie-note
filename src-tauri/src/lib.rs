@@ -5,6 +5,7 @@ mod commands;
 mod models;
 mod code_parser;
 mod scraper;
+mod providers;
 
 pub fn run() {
     tauri::Builder::default()
@@ -24,6 +25,12 @@ pub fn run() {
             commands::file_commands::get_movie_files,
             commands::file_commands::add_movie_file,
             commands::file_commands::remove_movie_file,
+            commands::file_commands::provider_list,
+            commands::file_commands::provider_search,
+            commands::file_commands::provider_resolve_url,
+            commands::file_commands::list_provider_configs,
+            commands::file_commands::save_provider_config,
+            commands::file_commands::delete_provider_config,
             commands::file_commands::get_movie_actors,
             commands::file_commands::add_movie_actor,
             commands::file_commands::remove_movie_actor,
@@ -39,12 +46,17 @@ pub fn run() {
             commands::actor_commands::remove_actor_from_category,
             commands::actor_commands::suggest_actors,
             commands::actor_commands::get_actor,
+            commands::actor_commands::get_actor_names,
             commands::actor_commands::get_actor_aliases,
+            commands::actor_commands::add_actor_name,
             commands::actor_commands::add_actor_alias,
+            commands::actor_commands::update_actor_name,
             commands::actor_commands::remove_actor_alias,
+            commands::actor_commands::remove_actor_name,
             commands::actor_commands::create_actor,
             commands::actor_commands::update_actor,
             commands::actor_commands::delete_actor,
+            commands::actor_commands::merge_actors,
             commands::actor_commands::get_actor_tags,
             commands::actor_commands::add_actor_tag,
             commands::actor_commands::remove_actor_tag,

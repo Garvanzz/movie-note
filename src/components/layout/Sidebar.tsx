@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AlertTriangle, DatabaseZap, Download, Film, FolderTree, Tag, Upload, Users } from "lucide-react";
+import { AlertTriangle, Cloud, DatabaseZap, Download, Film, FolderTree, Tag, Upload, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { assetUrl } from "@/lib/assetUrl";
 import { clearDatabase, exportAllData, importAllData, writeJsonFile } from "@/services/dataService";
@@ -15,6 +15,7 @@ const navItems = [
   { to: "/actors", label: "演员", icon: Users },
   { to: "/tags", label: "标签", icon: Tag },
   { to: "/genres", label: "类型", icon: FolderTree },
+  { to: "/providers", label: "网盘", icon: Cloud },
 ];
 
 export function Sidebar() {

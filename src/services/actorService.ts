@@ -1,5 +1,5 @@
 import { invoke } from "./invoke";
-import type { Actor, ActorCategory, ActorSuggestion } from "@/types/actor";
+import type { Actor, ActorCategory, ActorName, ActorNameKind, ActorSuggestion } from "@/types/actor";
 import type { PaginatedResult } from "@/types/common";
 import type { Tag } from "@/types/tag";
 
@@ -19,6 +19,10 @@ export function getActors(params: {
 
 export function getActor(id: number): Promise<Actor> {
   return invoke("get_actor", { id });
+}
+
+export function getActorNames(actorId: number): Promise<ActorName[]> {
+  return invoke("get_actor_names", { actorId });
 }
 
 export function getActorCategories(): Promise<ActorCategory[]> {
@@ -61,12 +65,24 @@ export function getActorAliases(actorId: number): Promise<string[]> {
   return invoke("get_actor_aliases", { actorId });
 }
 
+export function addActorName(actorId: number, name: string, kind: ActorNameKind, isPrimary = false): Promise<ActorName> {
+  return invoke("add_actor_name", { actorId, name, kind, isPrimary });
+}
+
 export function addActorAlias(actorId: number, alias: string): Promise<void> {
   return invoke("add_actor_alias", { actorId, alias });
 }
 
+export function updateActorName(id: number, name: string, kind: ActorNameKind, isPrimary: boolean): Promise<ActorName> {
+  return invoke("update_actor_name", { id, name, kind, isPrimary });
+}
+
 export function removeActorAlias(actorId: number, alias: string): Promise<void> {
   return invoke("remove_actor_alias", { actorId, alias });
+}
+
+export function removeActorName(id: number): Promise<void> {
+  return invoke("remove_actor_name", { id });
 }
 
 export function suggestActors(query: string, limit = 6): Promise<ActorSuggestion[]> {
@@ -101,6 +117,10 @@ export function updateActor(params: {
 
 export function deleteActor(id: number): Promise<void> {
   return invoke("delete_actor", { id });
+}
+
+export function mergeActors(sourceActorId: number, targetActorId: number): Promise<Actor> {
+  return invoke("merge_actors", { sourceActorId, targetActorId });
 }
 
 export function getActorTags(actorId: number): Promise<Tag[]> {

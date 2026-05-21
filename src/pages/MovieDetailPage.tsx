@@ -1,17 +1,18 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, Film, X } from "lucide-react";
+import { ArrowLeft, Cloud, Copy, Film, HardDrive, Plus, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ImageLightbox, type LightboxItem } from "@/components/ui/image-lightbox";
 import { MovieAssetsSection } from "@/components/movie/MovieAssetsSection";
+import { SearchSuggestionList } from "@/components/search/SearchSuggestionList";
 import { assetUrl } from "@/lib/assetUrl";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useImagePicker } from "@/hooks/useImagePicker";
 import { usePasteImage } from "@/hooks/usePasteImage";
-import { Input } from "@/components/ui/input";
-import { getActors } from "@/services/actorService";
+import { useActorSuggestions } from "@/hooks/useSearchSuggestions";
+import { createActor, suggestActors } from "@/services/actorService";
 import {
   addMovieCover,
   addMovieScreenshot,
@@ -35,6 +36,10 @@ import {
   updateMovie,
 } from "@/services/movieService";
 import { getGenres, getTags } from "@/services/tagService";
+import { getMovieFiles, addMovieFile, removeMovieFile } from "@/services/fileService";
+import { FileBrowserDialog, type SelectedFileEntry } from "@/components/movie/FileBrowserDialog";
+import { describeActorMatch, formatFileSize, getFileDisplayName, parseActorNames, parseFilePaths } from "@/lib/utils";
+import { InlineOptionMenu } from "@/components/ui/inline-option-menu";
 import { useRecentVisitsStore } from "@/stores/recentVisitsStore";
 import { toast } from "sonner";
 
@@ -52,9 +57,9 @@ export function MovieDetailPage() {
   const [rating, setRating] = useState<number | undefined>(undefined);
   const [comment, setComment] = useState("");
   const [actorSearch, setActorSearch] = useState("");
+  const [actorSearchFocused, setActorSearchFocused] = useState(false);
   const [tagMenuOpen, setTagMenuOpen] = useState(false);
   const [genreMenuOpen, setGenreMenuOpen] = useState(false);
-  const [actorMenuOpen, setActorMenuOpen] = useState(false);
   const [selectedCoverId, setSelectedCoverId] = useState<number | null>(null);
   const [lightboxItems, setLightboxItems] = useState<LightboxItem[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -64,6 +69,11 @@ export function MovieDetailPage() {
   const [actorBusy, setActorBusy] = useState(false);
   const [coverBusy, setCoverBusy] = useState(false);
   const [screenshotBusy, setScreenshotBusy] = useState(false);
+  const [fileBusy, setFileBusy] = useState(false);
+  const [newFilePath, setNewFilePath] = useState("");
+  const [fileBrowserOpen, setFileBrowserOpen] = useState(false);
+  const parsedActorNames = useMemo(() => parseActorNames(actorSearch), [actorSearch]);
+  const singleActorQuery = parsedActorNames.length === 1 ? parsedActorNames[0] : "";
 
   const { data: movie, isLoading } = useQuery({
     queryKey: ["movie", code],
@@ -111,11 +121,13 @@ export function MovieDetailPage() {
     queryFn: getGenres,
   });
 
-  const debouncedActorSearch = useDebounce(actorSearch, 200).trim();
-  const { data: actorPage } = useQuery({
-    queryKey: ["movieDetailActors", debouncedActorSearch],
-    queryFn: () => getActors({ search: debouncedActorSearch || undefined, page: 1, pageSize: 12 }),
+  const { data: files = [] } = useQuery({
+    queryKey: ["movieFiles", code],
+    queryFn: () => getMovieFiles(code!),
+    enabled: !!code,
   });
+
+  const { data: actorSuggestions = [], isFetching: isActorSuggestionsFetching } = useActorSuggestions(singleActorQuery, actorSearchFocused && singleActorQuery.length > 0, 12);
 
   const debouncedComment = useDebounce(comment, 500);
   const debouncedRating = useDebounce(rating, 180);
@@ -128,10 +140,15 @@ export function MovieDetailPage() {
   const genreIds = useMemo(() => new Set(genres.map((genre) => genre.id)), [genres]);
   const availableGenres = useMemo(() => allGenres.filter((genre) => !genreIds.has(genre.id)), [allGenres, genreIds]);
   const actorIds = useMemo(() => new Set(actors.map((actor) => actor.id)), [actors]);
-  const availableActors = useMemo(
-    () => (actorPage?.items ?? []).filter((actor) => !actorIds.has(actor.id)),
-    [actorIds, actorPage],
+  const availableActorSuggestions = useMemo(
+    () => actorSuggestions.filter((actor) => !actorIds.has(actor.id)),
+    [actorIds, actorSuggestions],
   );
+  const exactMatchedActors = useMemo(
+    () => actorSuggestions.filter((actor) => actor.match_kind.endsWith("_exact")),
+    [actorSuggestions],
+  );
+  const autoMatchedActor = exactMatchedActors.length === 1 ? exactMatchedActors[0] : null;
 
   const coverItems = useMemo(
     () =>
@@ -214,7 +231,6 @@ export function MovieDetailPage() {
     setComment(movie.comment ?? "");
     setTagMenuOpen(false);
     setGenreMenuOpen(false);
-    setActorMenuOpen(false);
     setSelectedCoverId(null);
   }, [movie]);
 
@@ -265,6 +281,67 @@ export function MovieDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["movie", code] }),
       queryClient.invalidateQueries({ queryKey: ["movies"] }),
     ]);
+  };
+
+  const invalidateFiles = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["movieFiles", code] }),
+      queryClient.invalidateQueries({ queryKey: ["movies"] }),
+    ]);
+  };
+
+  const handleAddFiles = async (paths: string[]) => {
+    if (!code) return;
+    setFileBusy(true);
+    try {
+      for (const filePath of paths) {
+        await addMovieFile(code, filePath);
+      }
+      setNewFilePath("");
+      await invalidateFiles();
+      toast.success(`已添加 ${paths.length} 个文件`);
+    } catch (error) {
+      toast.error(`添加文件失败: ${error}`);
+    } finally {
+      setFileBusy(false);
+    }
+  };
+
+  const handleRemoveFile = async (fileId: number) => {
+    setFileBusy(true);
+    try {
+      await removeMovieFile(fileId);
+      await invalidateFiles();
+    } catch (error) {
+      toast.error(`删除文件失败: ${error}`);
+    } finally {
+      setFileBusy(false);
+    }
+  };
+
+  const handleFilesSelected = async (selected: SelectedFileEntry[]) => {
+    if (!code) return;
+    setFileBusy(true);
+    try {
+      for (const f of selected) {
+        await addMovieFile(
+          code,
+          f.file_path,
+          f.file_name,
+          f.file_size ?? undefined,
+          f.provider,
+          f.provider_file_id,
+          f.provider_url ?? undefined,
+          undefined,
+        );
+      }
+      await invalidateFiles();
+      toast.success(`已关联 ${selected.length} 个文件`);
+    } catch (error) {
+      toast.error(`关联文件失败: ${error}`);
+    } finally {
+      setFileBusy(false);
+    }
   };
 
   const handleAddTag = async (tagId: number) => {
@@ -327,10 +404,82 @@ export function MovieDetailPage() {
     try {
       await addMovieActor(code, actorId);
       setActorSearch("");
-      setActorMenuOpen(false);
+      setActorSearchFocused(false);
       await invalidateActors();
     } catch (error) {
       toast.error(`添加演员失败: ${error}`);
+    } finally {
+      setActorBusy(false);
+    }
+  };
+
+  const handleSubmitActorSearch = async () => {
+    if (!code) return;
+
+    const names = parseActorNames(actorSearch);
+    if (names.length === 0) return;
+
+    setActorBusy(true);
+    try {
+      const linkedActorIds = new Set(actorIds);
+      const unresolvedNames: string[] = [];
+      let linkedExistingCount = 0;
+      let createdCount = 0;
+      let alreadyLinkedCount = 0;
+
+      for (const name of names) {
+        const suggestions = await suggestActors(name, 12);
+        const exactMatches = suggestions.filter((actor) => actor.match_kind.endsWith("_exact"));
+
+        if (exactMatches.length > 1) {
+          unresolvedNames.push(name);
+          continue;
+        }
+
+        if (exactMatches.length === 1) {
+          const matched = exactMatches[0];
+          if (linkedActorIds.has(matched.id)) {
+            alreadyLinkedCount += 1;
+            continue;
+          }
+
+          await addMovieActor(code, matched.id);
+          linkedActorIds.add(matched.id);
+          linkedExistingCount += 1;
+          continue;
+        }
+
+        const created = await createActor(name);
+        await addMovieActor(code, created.id);
+        linkedActorIds.add(created.id);
+        createdCount += 1;
+      }
+
+      if (linkedExistingCount > 0 || createdCount > 0) {
+        await Promise.all([
+          invalidateActors(),
+          queryClient.invalidateQueries({ queryKey: ["actors"] }),
+          queryClient.invalidateQueries({ queryKey: ["actorSuggestions"] }),
+        ]);
+      }
+
+      const summaryParts = [
+        linkedExistingCount > 0 ? `关联已有 ${linkedExistingCount} 位` : null,
+        createdCount > 0 ? `新建 ${createdCount} 位` : null,
+        alreadyLinkedCount > 0 ? `跳过已关联 ${alreadyLinkedCount} 位` : null,
+      ].filter(Boolean);
+
+      if (summaryParts.length > 0) {
+        toast.success(summaryParts.join("，"));
+      }
+      if (unresolvedNames.length > 0) {
+        toast.error(`这些名字存在多个精确匹配，请手动选择: ${unresolvedNames.slice(0, 4).join("、")}${unresolvedNames.length > 4 ? " 等" : ""}`);
+      }
+
+      setActorSearch(unresolvedNames.join("\n"));
+      setActorSearchFocused(unresolvedNames.length > 0 && unresolvedNames.length === 1);
+    } catch (error) {
+      toast.error(`处理演员失败: ${error}`);
     } finally {
       setActorBusy(false);
     }
@@ -599,31 +748,71 @@ export function MovieDetailPage() {
             </div>
 
             <div className="space-y-2">
-              <Input
-                placeholder="搜索演员..."
-                value={actorSearch}
-                onChange={(event) => setActorSearch(event.target.value)}
-                disabled={actorBusy}
-              />
-              {availableActors.length > 0 ? (
-                <InlineOptionMenu
-                  open={actorMenuOpen}
-                  onOpenChange={setActorMenuOpen}
-                  disabled={actorBusy}
-                  triggerLabel="选择演员"
-                  emptyLabel="没有匹配演员"
-                  options={availableActors.map((actor) => ({
-                    id: actor.id,
-                    label: actor.name,
-                    secondaryLabel: actor.name_jp ?? undefined,
-                  }))}
-                  onSelect={(id) => {
-                    void handleAddActor(id);
+              <div className="relative">
+                <textarea
+                  placeholder="支持批量粘贴演员名。每行一个，也支持逗号、顿号、分号分隔。"
+                  value={actorSearch}
+                  onFocus={() => setActorSearchFocused(true)}
+                  onBlur={() => window.setTimeout(() => setActorSearchFocused(false), 100)}
+                  onChange={(event) => setActorSearch(event.target.value)}
+                  onKeyDown={(event) => {
+                    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                      event.preventDefault();
+                      void handleSubmitActorSearch();
+                    }
                   }}
+                  disabled={actorBusy}
+                  className="min-h-24 w-full resize-y rounded-2xl border border-border/70 bg-background/70 px-4 py-3 text-sm leading-6 focus:outline-none focus:ring-1 focus:ring-ring"
                 />
-              ) : actorSearch ? (
-                <p className="text-xs text-muted-foreground">没有匹配演员</p>
+                <SearchSuggestionList
+                  open={actorSearchFocused && singleActorQuery.length > 0}
+                  loading={isActorSuggestionsFetching}
+                  emptyLabel="没有匹配演员，将按当前输入新建"
+                  items={availableActorSuggestions.map((actor) => ({
+                    key: String(actor.id),
+                    title: actor.name,
+                    subtitle: actor.matched_name !== actor.name ? `匹配: ${actor.matched_name}` : actor.name_jp || "演员",
+                    badge: actor.match_kind.startsWith("alias_") ? "别名" : actor.match_kind.startsWith("name_jp") ? "日文名" : "姓名",
+                    meta: describeActorMatch(actor.match_kind),
+                    onSelect: () => {
+                      void handleAddActor(actor.id);
+                    },
+                  }))}
+                />
+              </div>
+
+              {actorSearch.trim() ? (
+                <div className="rounded-2xl border border-border/70 bg-background/50 px-3 py-3 text-xs text-muted-foreground">
+                  {parsedActorNames.length > 1 ? (
+                    <p>已识别 {parsedActorNames.length} 个名字。处理时会逐个执行：唯一精确匹配则自动关联，没有精确匹配则新建，存在多个精确匹配则保留给你手动处理。</p>
+                  ) : autoMatchedActor ? (
+                    <p>
+                      检测到精确匹配，将自动关联到 <span className="font-medium text-foreground">{autoMatchedActor.name}</span>
+                      {autoMatchedActor.matched_name !== autoMatchedActor.name ? `（匹配名: ${autoMatchedActor.matched_name}）` : ""}。
+                    </p>
+                  ) : exactMatchedActors.length > 1 ? (
+                    <p>存在多个精确匹配，请先从下方候选里手动选择，避免误关联到错误演员。</p>
+                  ) : (
+                    <p>没有精确匹配时，会按当前输入新建演员档案并立即关联到这部影片。</p>
+                  )}
+                </div>
               ) : null}
+
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  void handleSubmitActorSearch();
+                }}
+                disabled={actorBusy || parsedActorNames.length === 0 || (parsedActorNames.length === 1 && exactMatchedActors.length > 1)}
+              >
+                <Plus className="size-4" />
+                {parsedActorNames.length > 1
+                  ? `批量处理 ${parsedActorNames.length} 位演员`
+                  : autoMatchedActor
+                    ? "关联已匹配演员"
+                    : "新建并关联演员"}
+              </Button>
             </div>
           </section>
 
@@ -661,6 +850,117 @@ export function MovieDetailPage() {
               className="min-h-56 w-full resize-none rounded-2xl border border-border/70 bg-background/70 px-4 py-3 text-sm leading-6 focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </section>
+
+          <section className="space-y-4 border-t border-border/70 px-6 py-5">
+            <div className="flex items-center gap-2">
+              <HardDrive className="size-4 text-muted-foreground" />
+              <h2 className="text-sm font-medium">关联文件</h2>
+              {files.length > 0 && (
+                <span className="text-xs text-muted-foreground">{files.length} 个</span>
+              )}
+            </div>
+
+            {files.length > 0 ? (
+              <div className="space-y-2">
+                {files.map((file) => (
+                  <div key={file.id} className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-background/40 px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium">{getFileDisplayName(file)}</span>
+                        <ProviderBadge provider={file.provider} />
+                      </div>
+                      <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{file.file_path}</div>
+                      <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
+                        {file.file_size != null && <span>{formatFileSize(file.file_size)}</span>}
+                        {file.provider_url && (
+                          <span className="truncate">{file.provider_url}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        title="复制路径"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(file.provider_url || file.file_path);
+                            toast.success("已复制路径");
+                          } catch {
+                            toast.error("复制失败");
+                          }
+                        }}
+                      >
+                        <Copy className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        title="删除"
+                        onClick={() => {
+                          void handleRemoveFile(file.id);
+                        }}
+                        disabled={fileBusy}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">暂无关联文件</p>
+            )}
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">手动输入路径，或从已配置的网盘浏览：</span>
+              </div>
+              <textarea
+                placeholder="粘贴一个或多个文件路径，每行一个..."
+                value={newFilePath}
+                onChange={(event) => setNewFilePath(event.target.value)}
+                className="min-h-20 w-full rounded-xl border border-border bg-background/70 px-3 py-2 font-mono text-xs leading-5 focus:outline-none focus:ring-1 focus:ring-ring"
+                disabled={fileBusy}
+                onKeyDown={(event) => {
+                  const paths = parseFilePaths(newFilePath);
+                  if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && paths.length > 0) {
+                    void handleAddFiles(paths);
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      const paths = parseFilePaths(newFilePath);
+                      if (paths.length > 0) void handleAddFiles(paths);
+                    }}
+                    disabled={fileBusy || parseFilePaths(newFilePath).length === 0}
+                    className="rounded-xl"
+                  >
+                    <Plus className="size-3.5" />
+                    添加 {parseFilePaths(newFilePath).length > 1 ? `${parseFilePaths(newFilePath).length} 个` : ""}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setFileBrowserOpen(true)}
+                    disabled={fileBusy}
+                    className="rounded-xl"
+                  >
+                    <Cloud className="size-3.5" />
+                    从网盘添加
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Ctrl+Enter 快速添加
+                </p>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
 
@@ -670,97 +970,42 @@ export function MovieDetailPage() {
         isOpen={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
       />
+
+      <FileBrowserDialog
+        open={fileBrowserOpen}
+        onClose={() => setFileBrowserOpen(false)}
+        onSelect={(selected) => {
+          void handleFilesSelected(selected);
+        }}
+        code={code}
+      />
     </div>
   );
 }
 
-interface InlineOptionMenuOption {
-  id: number;
-  label: string;
-  secondaryLabel?: string;
-}
+// ── File helpers ───────────────────────────────────────────────────────────
 
-function InlineOptionMenu({
-  open,
-  onOpenChange,
-  triggerLabel,
-  emptyLabel,
-  options,
-  disabled,
-  onSelect,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  triggerLabel: string;
-  emptyLabel: string;
-  options: InlineOptionMenuOption[];
-  disabled?: boolean;
-  onSelect: (id: number) => void;
-}) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (target && !containerRef.current?.contains(target)) {
-        onOpenChange(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onOpenChange(false);
-      }
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open, onOpenChange]);
-
+function ProviderBadge({ provider }: { provider: string }) {
+  if (provider === "local") {
+    return (
+      <span className="inline-flex items-center rounded-full border border-border/60 bg-background px-2 py-px text-[10px] text-muted-foreground">
+        本地
+      </span>
+    );
+  }
+  if (provider === "webdav") {
+    return (
+      <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-px text-[10px] text-blue-600 dark:text-blue-400">
+        WebDAV
+      </span>
+    );
+  }
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        className="flex h-10 w-full items-center justify-between rounded-2xl border border-input/80 bg-background/50 px-3 text-sm text-foreground transition-colors hover:bg-accent/40 disabled:opacity-50"
-        onClick={() => onOpenChange(!open)}
-        disabled={disabled}
-      >
-        <span>{triggerLabel}</span>
-        <ChevronDown className={`size-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-2xl border border-border/80 bg-card/95 p-1.5 shadow-2xl backdrop-blur">
-          {options.length > 0 ? (
-            <div className="max-h-64 overflow-y-auto">
-              {options.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-accent/60"
-                  onClick={() => {
-                    onSelect(option.id);
-                    onOpenChange(false);
-                  }}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate">{option.label}</span>
-                    {option.secondaryLabel ? <span className="block truncate text-xs text-muted-foreground">{option.secondaryLabel}</span> : null}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="px-3 py-2 text-sm text-muted-foreground">{emptyLabel}</div>
-          )}
-        </div>
-      ) : null}
-    </div>
+    <span className="inline-flex items-center rounded-full border border-border/60 bg-background px-2 py-px text-[10px] text-muted-foreground">
+      {provider}
+    </span>
   );
 }
+
+
+

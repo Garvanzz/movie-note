@@ -21,5 +21,13 @@ pub fn get_migrations() -> Vec<Migration> {
             version: 4,
             sql: include_str!("migrations/004_actor_tag_to_type.sql"),
         },
+        Migration {
+            version: 5,
+            sql: include_str!("migrations/005_actor_names.sql"),
+        },
+        Migration {
+            version: 6,
+            sql: include_str!("migrations/006_provider_fields.sql"),
+        },
     ]
 }

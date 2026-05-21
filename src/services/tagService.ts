@@ -26,9 +26,7 @@ export function deleteTagGroup(id: number): Promise<void> {
 }
 
 export async function getGenres(): Promise<Genre[]> {
-  const result = await invoke<Genre[]>("get_genres");
-  console.log("[getGenres] raw result:", result);
-  return result;
+  return invoke<Genre[]>("get_genres");
 }
 
 export function createGenre(name: string): Promise<Genre> {

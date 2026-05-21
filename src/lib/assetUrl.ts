@@ -1,20 +1,26 @@
 let _convertFn: ((path: string) => string) | null = null;
 
-function hasTauriRuntime() {
-  return !!(globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+type TauriInternals = {
+  convertFileSrc?: (path: string, protocol?: string) => string;
+};
+
+function resolveConvertFn() {
+  if (_convertFn) {
+    return _convertFn;
+  }
+
+  const internals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ as TauriInternals | undefined;
+  if (typeof internals?.convertFileSrc === "function") {
+    _convertFn = (path: string) => internals.convertFileSrc!(path, "asset");
+  }
+
+  return _convertFn;
 }
 
 // Eager preload that returns a promise so main.tsx can await it before rendering
 export function preloadAssetUrl(): Promise<void> {
-  if (!hasTauriRuntime()) return Promise.resolve();
-  return import("@tauri-apps/api/core")
-    .then((m) => {
-      _convertFn = m.convertFileSrc;
-      console.log("[assetUrl] convertFileSrc ready");
-    })
-    .catch((e) => {
-      console.error("[assetUrl] Failed to load convertFileSrc:", e);
-    });
+  resolveConvertFn();
+  return Promise.resolve();
 }
 
 export function assetUrl(path: string | null | undefined): string | undefined {
@@ -30,8 +36,9 @@ export function assetUrl(path: string | null | undefined): string | undefined {
     return path;
   }
 
-  if (_convertFn) {
-    return _convertFn(path.replace(/\\/g, "/"));
+  const convertFn = resolveConvertFn();
+  if (convertFn) {
+    return convertFn(path.replace(/\\/g, "/"));
   }
 
   // fallback: raw path (won't display in webview, but log for diagnosis)

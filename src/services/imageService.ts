@@ -101,12 +101,3 @@ export function saveImageBytes(
   return invoke("save_image_bytes", { imageType, owner, bytes, filename });
 }
 
-// ── Scraper ──
-
-export function scraperDownloadImages(
-  code: string,
-  coverUrl: string | null,
-  screenshots: string[],
-): Promise<void> {
-  return invoke("scraper_download_images", { code, coverUrl, screenshots });
-}

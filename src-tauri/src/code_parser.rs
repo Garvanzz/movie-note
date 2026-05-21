@@ -185,18 +185,6 @@ pub fn extract_series(code: &str) -> Option<String> {
     }
 }
 
-pub fn parse_variants(input: &str) -> Vec<String> {
-    let parsed = normalize_for_storage(input);
-    let mut variants = vec![parsed.canonical.clone(), parsed.code_norm.clone()];
-
-    let cleaned = clean_input(input);
-    if !cleaned.is_empty() && !variants.contains(&cleaned) {
-        variants.push(cleaned);
-    }
-
-    variants
-}
-
 fn build_parsed_code(
     canonical: String,
     kind: CodeKind,
@@ -286,13 +274,6 @@ mod tests {
         assert_eq!(normalize("FC2-PPV-1234567"), "FC2-PPV-1234567");
         assert_eq!(normalize("heyzo 3850"), "HEYZO-3850");
         assert_eq!(normalize("051926_001"), "051926-001");
-    }
-
-    #[test]
-    fn test_parse_variants() {
-        let v = parse_variants("IPX-123");
-        assert!(v.contains(&"IPX-123".to_string()));
-        assert!(v.contains(&"IPX123".to_string()));
     }
 
     #[test]

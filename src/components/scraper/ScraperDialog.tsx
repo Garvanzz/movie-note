@@ -12,7 +12,7 @@ import {
   scraperImport,
   type ScraperSearchResult,
 } from "@/services/scraperService";
-import { scraperDownloadImages } from "@/services/imageService";
+import { scraperDownloadImages } from "@/services/scraperService";
 
 interface Props {
   onClose: () => void;

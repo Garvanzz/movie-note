@@ -121,7 +121,7 @@ async fn download_image(app_data: &PathBuf, url: &str) -> Result<String, String>
     let filename = format!("{}.{}.{}", std::process::id(),
         SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0), ext);
     let dir = app_data.join("images");
-    std::fs::create_dir_all(&dir).ok();
+    std::fs::create_dir_all(&dir).map_err(|e| format!("创建图片目录失败: {}", e))?;
     let dest = dir.join(&filename);
     std::fs::write(&dest, &bytes).map_err(|e| format!("写入失败: {}", e))?;
     Ok(dest.to_string_lossy().to_string())
