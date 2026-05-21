@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "tauri": "tauri"
+    "tauri": "set PATH=%USERPROFILE%\\.cargo\\bin;%PATH%&& set RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-msvc&& tauri"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.10",
