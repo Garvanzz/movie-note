@@ -7,15 +7,28 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[tauri::command]
-pub async fn scraper_search(query: String) -> Result<Vec<ScraperSearchResult>, String> {
+pub async fn scraper_search(query: String, proxy_url: Option<String>) -> Result<Vec<ScraperSearchResult>, String> {
     let scrapers = scraper::get_scrapers();
     let mut all_results = Vec::new();
-    for scraper in scrapers {
-        match scraper.search(&query).await {
+    let mut errors: Vec<String> = Vec::new();
+    let proxy = proxy_url.as_deref().filter(|s| !s.is_empty());
+
+    for scraper in &scrapers {
+        match scraper.search(&query, proxy).await {
             Ok(mut results) => all_results.append(&mut results),
-            Err(e) => eprintln!("{} scraper error: {}", scraper.name(), e),
+            Err(e) => {
+                let msg = format!("{}: {}", scraper.name(), e);
+                eprintln!("scraper error: {}", msg);
+                errors.push(msg);
+            }
         }
     }
+
+    // If ALL scrapers failed, return a combined error so the user sees it
+    if all_results.is_empty() && !errors.is_empty() {
+        return Err(errors.join(" | "));
+    }
+
     // Deduplicate by code
     let mut seen = std::collections::HashSet::new();
     all_results.retain(|r| seen.insert(r.code.clone()));
@@ -23,11 +36,12 @@ pub async fn scraper_search(query: String) -> Result<Vec<ScraperSearchResult>, S
 }
 
 #[tauri::command]
-pub async fn scraper_get_detail(url: String, source: String) -> Result<ScraperMovieDetail, String> {
+pub async fn scraper_get_detail(url: String, source: String, proxy_url: Option<String>) -> Result<ScraperMovieDetail, String> {
     let scrapers = scraper::get_scrapers();
+    let proxy = proxy_url.as_deref().filter(|s| !s.is_empty());
     for scraper in scrapers {
         if scraper.name() == source {
-            return scraper.get_detail(&url).await;
+            return scraper.get_detail(&url, proxy).await;
         }
     }
     Err(format!("Unknown source: {source}"))
@@ -109,8 +123,9 @@ pub async fn scraper_import(db: State<'_, Database>, detail: ScraperMovieDetail)
     Ok(())
 }
 
-async fn download_image(app_data: &PathBuf, url: &str) -> Result<String, String> {
-    let resp = reqwest::get(url).await.map_err(|e| format!("下载失败: {}", e))?;
+async fn download_image(app_data: &PathBuf, url: &str, proxy_url: Option<&str>) -> Result<String, String> {
+    let client = crate::scraper::build_scraper_client(proxy_url)?;
+    let resp = client.get(url).send().await.map_err(|e| format!("下载失败: {}", e))?;
     let ct = resp.headers().get("content-type")
         .and_then(|v| v.to_str().ok()).unwrap_or("");
     let ext = if ct == "image/png" { "png" }
@@ -128,14 +143,15 @@ async fn download_image(app_data: &PathBuf, url: &str) -> Result<String, String>
 }
 
 #[tauri::command]
-pub async fn scraper_download_images(db: State<'_, Database>, code: String, cover_url: Option<String>, screenshots: Vec<String>) -> Result<(), String> {
+pub async fn scraper_download_images(db: State<'_, Database>, code: String, cover_url: Option<String>, screenshots: Vec<String>, proxy_url: Option<String>) -> Result<(), String> {
     let app_data = db.app_data_dir.clone();
     let code_upper = code.to_uppercase();
+    let proxy = proxy_url.as_deref().filter(|s| !s.is_empty());
 
     // Download cover
     if let Some(cover_url) = &cover_url {
         if !cover_url.is_empty() {
-            match download_image(&app_data, cover_url).await {
+            match download_image(&app_data, cover_url, proxy).await {
                 Ok(new_path) => {
                     let conn = db.conn.lock().map_err(|e| e.to_string())?;
                     // If the movie already has a cover_path that's a remote URL, replace it
@@ -171,7 +187,7 @@ pub async fn scraper_download_images(db: State<'_, Database>, code: String, cove
 
     // Download screenshots
     for (i, url) in screenshots.iter().enumerate() {
-        match download_image(&app_data, url).await {
+        match download_image(&app_data, url, proxy).await {
             Ok(new_path) => {
                 let conn = db.conn.lock().map_err(|e| e.to_string())?;
                 let _ = conn.execute(

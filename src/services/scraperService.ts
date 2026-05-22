@@ -26,12 +26,12 @@ export interface ScraperMovieDetail {
   source_site: string;
 }
 
-export function scraperSearch(query: string): Promise<ScraperSearchResult[]> {
-  return invoke("scraper_search", { query });
+export function scraperSearch(query: string, proxyUrl?: string): Promise<ScraperSearchResult[]> {
+  return invoke("scraper_search", { query, proxyUrl: proxyUrl ?? null });
 }
 
-export function scraperGetDetail(url: string, source: string): Promise<ScraperMovieDetail> {
-  return invoke("scraper_get_detail", { url, source });
+export function scraperGetDetail(url: string, source: string, proxyUrl?: string): Promise<ScraperMovieDetail> {
+  return invoke("scraper_get_detail", { url, source, proxyUrl: proxyUrl ?? null });
 }
 
 export function scraperImport(detail: ScraperMovieDetail): Promise<void> {
@@ -42,6 +42,7 @@ export function scraperDownloadImages(
   code: string,
   coverUrl: string | null,
   screenshots: string[],
+  proxyUrl?: string,
 ): Promise<void> {
-  return invoke("scraper_download_images", { code, coverUrl, screenshots });
+  return invoke("scraper_download_images", { code, coverUrl, screenshots, proxyUrl: proxyUrl ?? null });
 }

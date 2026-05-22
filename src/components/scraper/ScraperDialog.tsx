@@ -27,6 +27,7 @@ export function ScraperDialog({ onClose }: Props) {
   const [importingCode, setImportingCode] = useState<string | null>(null);
   const [importedCodes, setImportedCodes] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [proxyUrl, setProxyUrl] = useState(() => localStorage.getItem("scraper_proxy") ?? "http://127.0.0.1:7890");
   const { data: movieSuggestions = [], isFetching: isMovieSuggestionsFetching } = useMovieSuggestions(query, true, 6);
 
   const handleSearch = async (nextQuery?: string) => {
@@ -38,7 +39,7 @@ export function ScraperDialog({ onClose }: Props) {
       if (nextQuery) {
         setQuery(normalizedQuery);
       }
-      const data = await scraperSearch(normalizedQuery);
+      const data = await scraperSearch(normalizedQuery, proxyUrl || undefined);
       setResults(data);
       if (data.length === 0) setError("未找到结果");
     } catch (e) {
@@ -58,12 +59,13 @@ export function ScraperDialog({ onClose }: Props) {
     setImportingCode(result.code);
     setError(null);
     try {
-      const detail = await scraperGetDetail(result.url, result.source);
+      const detail = await scraperGetDetail(result.url, result.source, proxyUrl || undefined);
       await scraperImport(detail);
       await scraperDownloadImages(
         result.code,
         result.cover_url ?? null,
         detail.screenshots ?? [],
+        proxyUrl || undefined,
       );
       setImportedCodes((prev) => new Set(prev).add(result.code));
       queryClient.invalidateQueries({ queryKey: ["movies"] });
@@ -125,6 +127,17 @@ export function ScraperDialog({ onClose }: Props) {
               搜索
             </Button>
           </div>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="代理: http://127.0.0.1:7890 (Clash 默认)"
+              value={proxyUrl}
+              onChange={(e) => {
+                setProxyUrl(e.target.value);
+                localStorage.setItem("scraper_proxy", e.target.value);
+              }}
+              className="h-8 flex-1 rounded-xl border-border/60 bg-background/50 text-xs font-mono shadow-none"
+            />
+          </div>
           {error && <p className="text-sm text-destructive mt-2">{error}</p>}
         </div>
 
@@ -146,14 +159,8 @@ export function ScraperDialog({ onClose }: Props) {
                 key={`${r.source}:${r.code}`}
                 className="flex gap-3 p-3 bg-muted/40 rounded-lg border border-border hover:border-primary/30 transition-colors"
               >
-                <div className="w-16 shrink-0 aspect-[3/4] bg-muted rounded overflow-hidden">
-                  {r.cover_url ? (
-                    <img src={r.cover_url} alt={r.code} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Film className="size-6 text-muted-foreground/30" />
-                    </div>
-                  )}
+                <div className="w-16 shrink-0 aspect-[3/4] bg-muted rounded overflow-hidden flex items-center justify-center">
+                  <Film className="size-6 text-muted-foreground/30" />
                 </div>
                 <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center gap-1.5">

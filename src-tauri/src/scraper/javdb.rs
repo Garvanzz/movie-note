@@ -1,11 +1,10 @@
-use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE};
-use crate::scraper::{ScraperSearchResult, ScraperMovieDetail};
+use crate::scraper::{ScraperSearchResult, ScraperMovieDetail, build_scraper_client};
 
 pub struct JavDbScraper;
 
 impl JavDbScraper {
-    pub async fn search(&self, query: &str) -> Result<Vec<ScraperSearchResult>, String> {
-        let client = build_client()?;
+    pub async fn search(&self, query: &str, proxy_url: Option<&str>) -> Result<Vec<ScraperSearchResult>, String> {
+        let client = build_scraper_client(proxy_url)?;
         let url = format!("https://javdb.com/search?q={}&f=all", urlencoding(query));
         let html = client.get(&url)
             .send().await.map_err(|e| format!("请求失败: {e}"))?
@@ -13,8 +12,8 @@ impl JavDbScraper {
         parse_search_results(&html, "javdb")
     }
 
-    pub async fn get_detail(&self, url: &str) -> Result<ScraperMovieDetail, String> {
-        let client = build_client()?;
+    pub async fn get_detail(&self, url: &str, proxy_url: Option<&str>) -> Result<ScraperMovieDetail, String> {
+        let client = build_scraper_client(proxy_url)?;
         let url = if url.starts_with("http") { url.to_string() } else { format!("https://javdb.com{}", url) };
         let html = client.get(&url)
             .send().await.map_err(|e| format!("请求失败: {e}"))?
@@ -23,23 +22,20 @@ impl JavDbScraper {
     }
 }
 
-fn build_client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .cookie_store(true)
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-        .default_headers({
-            let mut h = reqwest::header::HeaderMap::new();
-            h.insert(ACCEPT, "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8".parse().unwrap());
-            h.insert(ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9,ja;q=0.8".parse().unwrap());
-            h
-        })
-        .timeout(std::time::Duration::from_secs(15))
-        .build()
-        .map_err(|e| format!("创建HTTP客户端失败: {e}"))
-}
-
 fn urlencoding(s: &str) -> String {
-    s.replace(' ', "+").replace('-', "-")
+    // Proper percent-encode for query parameter values
+    let mut result = String::with_capacity(s.len());
+    for byte in s.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => result.push(byte as char),
+            b' ' => result.push('+'),
+            other => {
+                result.push('%');
+                result.push_str(&format!("{:02X}", other));
+            }
+        }
+    }
+    result
 }
 
 fn parse_search_results(html: &str, source: &str) -> Result<Vec<ScraperSearchResult>, String> {

@@ -1,5 +1,6 @@
 pub mod config;
 pub mod local;
+pub mod open115;
 pub mod webdav;
 
 use crate::models::ProviderFileEntry;

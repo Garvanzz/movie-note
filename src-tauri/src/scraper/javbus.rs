@@ -1,11 +1,10 @@
-use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE};
-use crate::scraper::{ScraperSearchResult, ScraperMovieDetail};
+use crate::scraper::{ScraperSearchResult, ScraperMovieDetail, build_scraper_client};
 
 pub struct JavBusScraper;
 
 impl JavBusScraper {
-    pub async fn search(&self, query: &str) -> Result<Vec<ScraperSearchResult>, String> {
-        let client = build_client()?;
+    pub async fn search(&self, query: &str, proxy_url: Option<&str>) -> Result<Vec<ScraperSearchResult>, String> {
+        let client = build_scraper_client(proxy_url)?;
         let url = format!("https://www.javbus.com/search/{}", query.trim().replace(' ', "-").replace('_', "-"));
         let html = client.get(&url)
             .send().await.map_err(|e| format!("请求失败: {e}"))?
@@ -13,8 +12,8 @@ impl JavBusScraper {
         parse_search(&html)
     }
 
-    pub async fn get_detail(&self, url: &str) -> Result<ScraperMovieDetail, String> {
-        let client = build_client()?;
+    pub async fn get_detail(&self, url: &str, proxy_url: Option<&str>) -> Result<ScraperMovieDetail, String> {
+        let client = build_scraper_client(proxy_url)?;
         let url = if url.starts_with("http") { url.to_string() } else { format!("https://www.javbus.com{}", url) };
         let html = client.get(&url)
             .send().await.map_err(|e| format!("请求失败: {e}"))?
@@ -23,25 +22,9 @@ impl JavBusScraper {
     }
 }
 
-fn build_client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .cookie_store(true)
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-        .default_headers({
-            let mut h = reqwest::header::HeaderMap::new();
-            h.insert(ACCEPT, "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8".parse().unwrap());
-            h.insert(ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9,ja;q=0.8".parse().unwrap());
-            h.insert("Accept-Encoding", "gzip, deflate".parse().unwrap());
-            h
-        })
-        .timeout(std::time::Duration::from_secs(15))
-        .build()
-        .map_err(|e| format!("创建HTTP客户端失败: {e}"))
-}
-
 fn parse_search(html: &str) -> Result<Vec<ScraperSearchResult>, String> {
     let document = scraper::Html::parse_document(html);
-    let item_sel = scraper::Selector::parse("a.movie-box, .movie-box a, a[href*='/']").map_err(|e| e.to_string())?;
+    let item_sel = scraper::Selector::parse("a.movie-box, .movie-box a").map_err(|e| e.to_string())?;
     let cover_sel = scraper::Selector::parse("img").map_err(|e| e.to_string())?;
     let date_sel = scraper::Selector::parse("date, .date").map_err(|e| e.to_string())?;
 

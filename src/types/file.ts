@@ -21,7 +21,7 @@ export interface ProviderFileEntry {
 export interface ProviderConfigData {
   id: string;
   name: string;
-  provider_type: string; // "local" | "webdav"
+  provider_type: string; // "local" | "webdav" | "open115"
   endpoint: string | null;
   username: string | null;
   password: string | null;

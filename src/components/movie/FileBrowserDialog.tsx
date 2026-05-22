@@ -6,6 +6,9 @@ import {
   CloudOff,
   Folder,
   FolderOpen,
+  Globe,
+  HardDrive,
+  Link,
   Loader2,
   Search,
   X,
@@ -199,12 +202,15 @@ export function FileBrowserDialog({ open, onClose, onSelect, code }: FileBrowser
                     key={c.id}
                     type="button"
                     onClick={() => handleProviderSelect(c.id)}
-                    className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-colors ${
                       c.id === providerId
                         ? "bg-primary/15 text-primary border border-primary/30"
                         : "border border-border/60 text-muted-foreground hover:bg-accent"
                     }`}
                   >
+                    {c.provider_type === "local" ? <HardDrive className="size-3" />
+                      : c.provider_type === "open115" ? <Link className="size-3" />
+                      : <Globe className="size-3" />}
                     {c.name}
                   </button>
                 ))}

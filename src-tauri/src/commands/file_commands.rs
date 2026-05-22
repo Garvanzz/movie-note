@@ -4,7 +4,7 @@ use tauri::State;
 use crate::code_parser::normalize_for_storage;
 use crate::db::Database;
 use crate::models::{CloudFile, ProviderFileEntry};
-use crate::providers::{FileProvider, config::ProviderConfig, local::LocalProvider, webdav::WebdavProvider};
+use crate::providers::{FileProvider, config::ProviderConfig, local::LocalProvider, open115::Open115Provider, webdav::WebdavProvider};
 
 #[tauri::command]
 pub fn get_movie_files(db: State<Database>, code: String) -> Result<Vec<CloudFile>, String> {
@@ -128,6 +128,7 @@ pub fn remove_movie_actor(db: State<Database>, code: String, actor_id: i64) -> R
 /// List files/directories under a given path using the named provider.
 #[tauri::command]
 pub fn provider_list(
+    db: State<Database>,
     provider_name: String,
     path: String,
     // Provider-specific config
@@ -136,13 +137,14 @@ pub fn provider_list(
     username: Option<String>,
     password: Option<String>,
 ) -> Result<Vec<ProviderFileEntry>, String> {
-    let provider = build_provider(&provider_name, root.as_deref(), endpoint.as_deref(), username.as_deref(), password.as_deref())?;
+    let provider = build_provider(&provider_name, root.as_deref(), endpoint.as_deref(), username.as_deref(), password.as_deref(), &db.app_data_dir)?;
     provider.list(&path)
 }
 
 /// Search for files matching a movie code using the named provider.
 #[tauri::command]
 pub fn provider_search(
+    db: State<Database>,
     provider_name: String,
     code: String,
     root: Option<String>,
@@ -150,13 +152,14 @@ pub fn provider_search(
     username: Option<String>,
     password: Option<String>,
 ) -> Result<Vec<ProviderFileEntry>, String> {
-    let provider = build_provider(&provider_name, root.as_deref(), endpoint.as_deref(), username.as_deref(), password.as_deref())?;
+    let provider = build_provider(&provider_name, root.as_deref(), endpoint.as_deref(), username.as_deref(), password.as_deref(), &db.app_data_dir)?;
     provider.search(&code)
 }
 
 /// Resolve a playback-ready URL for a file on a given provider.
 #[tauri::command]
 pub fn provider_resolve_url(
+    db: State<Database>,
     provider_name: String,
     file_id: String,
     root: Option<String>,
@@ -164,7 +167,7 @@ pub fn provider_resolve_url(
     username: Option<String>,
     password: Option<String>,
 ) -> Result<String, String> {
-    let provider = build_provider(&provider_name, root.as_deref(), endpoint.as_deref(), username.as_deref(), password.as_deref())?;
+    let provider = build_provider(&provider_name, root.as_deref(), endpoint.as_deref(), username.as_deref(), password.as_deref(), &db.app_data_dir)?;
     provider.resolve_playback_url(&file_id)
 }
 
@@ -174,12 +177,17 @@ fn build_provider(
     endpoint: Option<&str>,
     username: Option<&str>,
     password: Option<&str>,
+    app_data_dir: &std::path::PathBuf,
 ) -> Result<Box<dyn FileProvider>, String> {
     match name {
         "local" => Ok(Box::new(LocalProvider::new(root.map(|s| s.to_string())))),
         "webdav" => {
             let ep = endpoint.ok_or_else(|| "WebDAV provider requires 'endpoint'".to_string())?;
             Ok(Box::new(WebdavProvider::new("webdav", ep, username, password)))
+        }
+        "open115" => {
+            let cid = endpoint.ok_or_else(|| "115Open provider requires 'client_id' as endpoint".to_string())?;
+            Ok(Box::new(Open115Provider::new("open115", cid, app_data_dir.clone())))
         }
         other => Err(format!("Unknown provider: {}", other)),
     }
@@ -208,4 +216,96 @@ pub fn delete_provider_config(db: State<Database>, id: String) -> Result<(), Str
     let mut configs = crate::providers::config::load_configs(&db.app_data_dir)?;
     configs.retain(|c| c.id != id);
     crate::providers::config::save_configs(&db.app_data_dir, &configs)
+}
+
+// ── 115 Open OAuth commands ───────────────────────────────────────────────
+
+#[tauri::command]
+pub fn open115_start_auth(client_id: String) -> Result<crate::providers::open115::DeviceCodeData, String> {
+    crate::providers::open115::Open115Provider::start_device_code(&client_id)
+}
+
+#[tauri::command]
+pub fn open115_poll_status(uid: String, time: i64, sign: String) -> Result<crate::providers::open115::QrCodeStatusData, String> {
+    crate::providers::open115::Open115Provider::poll_qrcode_status(&uid, time, &sign)
+}
+
+#[tauri::command]
+pub fn open115_exchange_token(db: State<Database>, client_id: String, uid: String) -> Result<crate::providers::open115::TokenData, String> {
+    crate::providers::open115::Open115Provider::exchange_token(&client_id, &uid, &db.app_data_dir)
+}
+
+#[tauri::command]
+pub fn open115_get_user_info(db: State<Database>, client_id: String) -> Result<crate::providers::open115::UserInfo, String> {
+    let provider = crate::providers::open115::Open115Provider::new("open115", &client_id, db.app_data_dir.clone());
+    provider.get_user_info()
+}
+
+#[tauri::command]
+pub fn open115_check_auth(db: State<Database>, client_id: String) -> Result<bool, String> {
+    let provider = crate::providers::open115::Open115Provider::new("open115", &client_id, db.app_data_dir.clone());
+    Ok(provider.is_authenticated())
+}
+
+#[tauri::command]
+pub fn open115_logout(db: State<Database>) -> Result<(), String> {
+    crate::providers::open115::delete_token(&db.app_data_dir)
+}
+
+// ── 115 Open file operations ──────────────────────────────────────────────
+
+#[tauri::command]
+pub fn open115_mkdir(db: State<Database>, client_id: String, pid: String, name: String) -> Result<String, String> {
+    let provider = crate::providers::open115::Open115Provider::new("open115", &client_id, db.app_data_dir.clone());
+    provider.mkdir(&pid, &name)
+}
+
+#[tauri::command]
+pub fn open115_rename(db: State<Database>, client_id: String, file_id: String, new_name: String) -> Result<(), String> {
+    let provider = crate::providers::open115::Open115Provider::new("open115", &client_id, db.app_data_dir.clone());
+    provider.rename(&file_id, &new_name)
+}
+
+#[tauri::command]
+pub fn open115_delete(db: State<Database>, client_id: String, file_ids: String, parent_id: String) -> Result<(), String> {
+    let provider = crate::providers::open115::Open115Provider::new("open115", &client_id, db.app_data_dir.clone());
+    provider.delete_files(&file_ids, &parent_id)
+}
+
+#[tauri::command]
+pub fn open115_move(db: State<Database>, client_id: String, file_ids: String, to_cid: String) -> Result<(), String> {
+    let provider = crate::providers::open115::Open115Provider::new("open115", &client_id, db.app_data_dir.clone());
+    provider.move_files(&file_ids, &to_cid)
+}
+
+#[tauri::command]
+pub fn open115_copy(db: State<Database>, client_id: String, file_ids: String, pid: String) -> Result<(), String> {
+    let provider = crate::providers::open115::Open115Provider::new("open115", &client_id, db.app_data_dir.clone());
+    provider.copy_files(&file_ids, &pid)
+}
+
+// ── 115 Open stat / recycle ───────────────────────────────────────────────
+
+#[tauri::command]
+pub fn open115_stat(db: State<Database>, client_id: String, file_id: String) -> Result<serde_json::Value, String> {
+    let provider = crate::providers::open115::Open115Provider::new("open115", &client_id, db.app_data_dir.clone());
+    provider.stat(&file_id)
+}
+
+#[tauri::command]
+pub fn open115_rb_list(db: State<Database>, client_id: String, limit: i64, offset: i64) -> Result<serde_json::Value, String> {
+    let provider = crate::providers::open115::Open115Provider::new("open115", &client_id, db.app_data_dir.clone());
+    provider.rb_list(limit, offset)
+}
+
+#[tauri::command]
+pub fn open115_rb_revert(db: State<Database>, client_id: String, tid: String) -> Result<(), String> {
+    let provider = crate::providers::open115::Open115Provider::new("open115", &client_id, db.app_data_dir.clone());
+    provider.rb_revert(&tid)
+}
+
+#[tauri::command]
+pub fn open115_rb_delete(db: State<Database>, client_id: String, tid: String) -> Result<(), String> {
+    let provider = crate::providers::open115::Open115Provider::new("open115", &client_id, db.app_data_dir.clone());
+    provider.rb_delete(&tid)
 }

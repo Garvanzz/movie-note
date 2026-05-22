@@ -15,7 +15,7 @@ const navItems = [
   { to: "/actors", label: "演员", icon: Users },
   { to: "/tags", label: "标签", icon: Tag },
   { to: "/genres", label: "类型", icon: FolderTree },
-  { to: "/providers", label: "网盘", icon: Cloud },
+  { to: "/cloud", label: "网盘", icon: Cloud },
 ];
 
 export function Sidebar() {
